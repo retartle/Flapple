@@ -3,9 +3,9 @@
   "776991810744221716": {
    "Pokeballs": 69,
    "Greatballs": 69,
-   "Ultraballs": 68,
+   "Ultraballs": 67,
    "Masterballs": -20,
-   "Pokedollars": 100,
+   "Pokedollars": 237,
    "caught_pokemon": [
     "000001",
     "000002",
@@ -16,15 +16,16 @@
     "000008",
     "000009",
     "000010",
-    "000011"
+    "000011",
+    "000084"
    ]
   },
   "505213604023500810": {
-   "Pokeballs": 4,
+   "Pokeballs": 3,
    "Greatballs": 989,
-   "Ultraballs": 3978,
+   "Ultraballs": 3975,
    "Masterballs": 0,
-   "Pokedollars": 4189,
+   "Pokedollars": 4566,
    "caught_pokemon": [
     "000012",
     "000013",
@@ -76,7 +77,11 @@
     "000080",
     "000081",
     "000082",
-    "000083"
+    "000083",
+    "000085",
+    "000086",
+    "000087",
+    "000088"
    ]
   },
   "786083062172745770": {

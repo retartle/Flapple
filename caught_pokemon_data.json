@@ -1553,7 +1553,7 @@
   "unique_id": "000051",
   "pokedex_id": 249,
   "name": "lugia",
-  "shiny": false,
+  "shiny": true,
   "level": 9,
   "ivs": {
    "hp": 8,
@@ -2570,6 +2570,161 @@
    "special-attack": 19,
    "special-defense": 18,
    "speed": 21
+  }
+ },
+ "000084": {
+  "unique_id": "000084",
+  "pokedex_id": 434,
+  "name": "stunky",
+  "shiny": false,
+  "level": 14,
+  "ivs": {
+   "hp": 31,
+   "attack": 11,
+   "defense": 28,
+   "special-attack": 10,
+   "special-defense": 1,
+   "speed": 2
+  },
+  "base_stats": {
+   "hp": 63,
+   "attack": 63,
+   "defense": 47,
+   "special-attack": 41,
+   "special-defense": 41,
+   "speed": 74
+  },
+  "final_stats": {
+   "hp": 26,
+   "attack": 24,
+   "defense": 22,
+   "special-attack": 17,
+   "special-defense": 16,
+   "speed": 26
+  }
+ },
+ "000085": {
+  "unique_id": "000085",
+  "pokedex_id": 747,
+  "name": "mareanie",
+  "shiny": false,
+  "level": 15,
+  "ivs": {
+   "hp": 0,
+   "attack": 15,
+   "defense": 2,
+   "special-attack": 24,
+   "special-defense": 8,
+   "speed": 1
+  },
+  "base_stats": {
+   "hp": 50,
+   "attack": 53,
+   "defense": 62,
+   "special-attack": 43,
+   "special-defense": 52,
+   "speed": 45
+  },
+  "final_stats": {
+   "hp": 20,
+   "attack": 23,
+   "defense": 23,
+   "special-attack": 21,
+   "special-defense": 21,
+   "speed": 18
+  }
+ },
+ "000086": {
+  "unique_id": "000086",
+  "pokedex_id": 713,
+  "name": "avalugg",
+  "shiny": false,
+  "level": 11,
+  "ivs": {
+   "hp": 7,
+   "attack": 2,
+   "defense": 31,
+   "special-attack": 10,
+   "special-defense": 5,
+   "speed": 12
+  },
+  "base_stats": {
+   "hp": 95,
+   "attack": 117,
+   "defense": 184,
+   "special-attack": 44,
+   "special-defense": 46,
+   "speed": 28
+  },
+  "final_stats": {
+   "hp": 26,
+   "attack": 30,
+   "defense": 48,
+   "special-attack": 15,
+   "special-defense": 15,
+   "speed": 12
+  }
+ },
+ "000087": {
+  "unique_id": "000087",
+  "pokedex_id": 493,
+  "name": "arceus",
+  "shiny": false,
+  "level": 11,
+  "ivs": {
+   "hp": 11,
+   "attack": 18,
+   "defense": 15,
+   "special-attack": 14,
+   "special-defense": 12,
+   "speed": 7
+  },
+  "base_stats": {
+   "hp": 120,
+   "attack": 120,
+   "defense": 120,
+   "special-attack": 120,
+   "special-defense": 120,
+   "speed": 120
+  },
+  "final_stats": {
+   "hp": 32,
+   "attack": 33,
+   "defense": 33,
+   "special-attack": 32,
+   "special-defense": 32,
+   "speed": 32
+  }
+ },
+ "000088": {
+  "unique_id": "000088",
+  "pokedex_id": 842,
+  "name": "appletun",
+  "shiny": false,
+  "level": 18,
+  "ivs": {
+   "hp": 31,
+   "attack": 28,
+   "defense": 14,
+   "special-attack": 23,
+   "special-defense": 18,
+   "speed": 21
+  },
+  "base_stats": {
+   "hp": 110,
+   "attack": 85,
+   "defense": 80,
+   "special-attack": 100,
+   "special-defense": 80,
+   "speed": 30
+  },
+  "final_stats": {
+   "hp": 50,
+   "attack": 40,
+   "defense": 36,
+   "special-attack": 45,
+   "special-defense": 37,
+   "speed": 19
   }
  }
 }

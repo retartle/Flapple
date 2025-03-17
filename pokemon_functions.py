@@ -9,7 +9,7 @@ async def update_embed_title(message, new_title):
     await message.edit(embed=embed)  # Edit the message with the updated embed
 
 def initialize_wild_pool():
-    with open('all_pokemon_data.json', 'r') as file:
+    with open('all_pokemon_data_v2.json', 'r') as file:
         pokemon_data = json.load(file)
     
     normal_ID_list = [pokemon["id"] for pokemon in pokemon_data if pokemon['rarity'] == "Normal"]
@@ -19,14 +19,14 @@ def initialize_wild_pool():
     return normal_ID_list, mythical_ID_list, legendary_ID_list
 
 def load_pokemon_into_dict():
-    with open('all_pokemon_data.json', 'r') as file:
+    with open('all_pokemon_data_v2.json', 'r') as file:
         pokemon_data = json.load(file)
 
     pokemon_dict = {pokemon["name"]: pokemon for pokemon in pokemon_data}
     return pokemon_dict
 
 def load_pokemon_into_dict_id():
-    with open('all_pokemon_data.json', 'r') as file:
+    with open('all_pokemon_data_v2.json', 'r') as file:
         pokemon_data = json.load(file)
 
     pokemon_dict = {pokemon["id"]: pokemon for pokemon in pokemon_data}
