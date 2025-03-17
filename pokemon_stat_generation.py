@@ -38,13 +38,14 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
         "speed": generate_iv()
     }
 
-    unique_id = generate_unique_id()
+    unique_id = generate_unique_id()  # Generate a new unique identifier
 
+    # Store full Pokémon data separately in "caught_pokemon_data.json"
     caught_pokemon = {
-        "unique_id" : unique_id,
+        "unique_id": unique_id,
         "pokedex_id": pokemon_data["id"],
         "name": pokemon_data["name"],
-        "shiny" : shiny,
+        "shiny": shiny,
         "level": level,
         "ivs": ivs,
         "base_stats": pokemon_data["stats"],
@@ -56,25 +57,41 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
             "special-defense": calculate_stat(pokemon_data["stats"]["special-defense"], ivs["special-defense"], level),
             "speed": calculate_stat(pokemon_data["stats"]["speed"], ivs["speed"], level)
         }
-    }        
+    }
 
+    # Save the caught Pokémon data in "caught_pokemon_data.json"
     with open("caught_pokemon_data.json", "r+") as file:
         try:
             data = json.load(file)
         except json.JSONDecodeError:
-            data = {}  # If file is empty or invalid, start with an empty dictionary
+            data = {}  # If the file is empty or invalid, start with an empty dictionary
         data[unique_id] = caught_pokemon
         file.seek(0)
         json.dump(data, file, indent=1)
         file.truncate()
 
+    # Update the user's inventory in "Inventory.json"
     with open("Inventory.json", "r+") as file:
-        data = json.load(file)
-        if "caught_pokemon" not in data["users"][str(user_id)]:
-            data["users"][str(user_id)] = {"caught_pokemon": []}
-        data["users"][str(user_id)]["caught_pokemon"].append(unique_id)
+        try:
+            inventory = json.load(file)
+        except json.JSONDecodeError:
+            inventory = {"users": {}}  # Ensure a valid structure
+
+        # Ensure the user's data exists
+        if "users" not in inventory:
+            inventory["users"] = {}
+
+        if str(user_id) not in inventory["users"]:
+            inventory["users"][str(user_id)] = {"caught_pokemon": []}
+
+        # Store only the unique_id inside "caught_pokemon"
+        if "caught_pokemon" not in inventory["users"][str(user_id)]:
+            inventory["users"][str(user_id)]["caught_pokemon"] = []
+
+        inventory["users"][str(user_id)]["caught_pokemon"].append(unique_id)
+
         file.seek(0)
-        json.dump(data, file, indent=1)
+        json.dump(inventory, file, indent=1)
         file.truncate()
 
-    return unique_id
+    return unique_id  # Return the unique ID of the caught Pokémon

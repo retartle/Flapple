@@ -1,13 +1,6 @@
 {
-    "pokeballs_normal" :{
-        "Pokeball": 50,
-        "Greatball": 65,
-        "Ultraball": 80,
-        "Masterball": 100},
-    
-    "pokeballs_myth/leg" :{
-        "Pokeball": 20,
-        "Greatball": 35,
-        "Ultraball": 50,
-        "Masterball": 100}
+    "Pokeball": 1.0,
+    "Greatball": 1.5,
+    "Ultraball": 2.0,
+    "Masterball": 255.0
 }
