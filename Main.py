@@ -173,9 +173,10 @@ async def search(ctx):
         await update_embed_title(SHembed_editor, f"{name} escaped... It rolled a {catch} but you only had {rate}")
         
 @client.command()
-async def box(ctx, user: discord.Member = None):
+async def box(ctx, page: int = 1, user: discord.Member = None):
     if user == None:
         user = ctx.author
+    
     with open("Inventory.json", "r") as file:
         data = json.load(file)
 
@@ -188,18 +189,232 @@ async def box(ctx, user: discord.Member = None):
             return
         
         caught_id_list = data["users"][str(user.id)]["caught_pokemon"]
-
-        BXembed = discord.Embed (title=f"{user.name}'s Pokemon Box") #add color idk what
         
-        for pokemon_id in caught_id_list:
-            pokemon = search_pokemon_by_unique_id(str(pokemon_id))
-            name = pokemon["name"].capitalize().replace('-', ' ')
-            shiny = pokemon["shiny"]
-            if shiny:
-                name = f"{name}:star2:"
-            BXembed.add_field(name=f"{name}", value="description")
+        # Calculate total pages needed (25 pokemon per page)
+        total_pokemon = len(caught_id_list)
+        pokemon_per_page = 12
+        total_pages = max(1, (total_pokemon + pokemon_per_page - 1) // pokemon_per_page)  # Ceiling division
+        
+        # Generate a fixed color for this user's box
+        # Using the user ID ensures same user always gets same color
+        color_seed = int(user.id) % 0xFFFFFF
+        box_color = discord.Colour(color_seed)
+        
+        # Validate and limit page number
+        current_page = max(1, min(page, total_pages))
+        
+        # Function to get embed for a specific page
+        def get_page_embed(page_num):
+            start_idx = (page_num - 1) * pokemon_per_page
+            end_idx = min(start_idx + pokemon_per_page, total_pokemon)
+            current_page_pokemon = caught_id_list[start_idx:end_idx]
+            
+            embed = discord.Embed(
+                title=f"{user.name}'s Pokemon Box - Page {page_num}/{total_pages}",
+                color=box_color  # Using the fixed color for consistency
+            )
+            
+            for i, pokemon_id in enumerate(current_page_pokemon):
+                pokemon = search_pokemon_by_unique_id(str(pokemon_id))
+                name = pokemon["name"].capitalize().replace('-', ' ')
+                shiny = pokemon["shiny"]
+                level = pokemon["level"]
+                
+                # Calculate the global number (simple sequential number)
+                global_number = start_idx + i + 1
+                
+                if shiny:
+                    name = f"{name} ⭐"
+                    
+                # Include more useful information in the value field
+                value = f"Level: {level}"
+                if "ivs" in pokemon:
+                    ivs = pokemon["ivs"]
+                    if isinstance(ivs, dict):
+                        total_iv = sum(ivs.values())
+                        value += f" | Total IV: {total_iv}/186"
+                
+                # Add the global number to the name for easier reference
+                field_name = f"#{global_number}. {name}"
+                embed.add_field(name=field_name, value=value, inline=True)
+            
+            embed.set_footer(text=f"Page {page_num}/{total_pages} | Use reactions to navigate | Use '%view [number]' to view details")
+            return embed
+        
+        # Send initial embed
+        message = await ctx.send(embed=get_page_embed(current_page))
+        
+        # Don't add reactions if there's only one page
+        if total_pages <= 1:
+            return
+            
+        # Add navigation reactions
+        reactions = ['⏪', '⬅️', '➡️', '⏩']
+        for reaction in reactions:
+            await message.add_reaction(reaction)
+            
+        # Define check function for reactions
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) in reactions and reaction.message.id == message.id
+            
+        # Reaction handler
+        while True:
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                
+                # Remove user's reaction
+                await message.remove_reaction(reaction, user)
+                
+                # Update page based on reaction
+                if str(reaction.emoji) == '⬅️' and current_page > 1:
+                    current_page -= 1
+                    await message.edit(embed=get_page_embed(current_page))
+                    
+                elif str(reaction.emoji) == '➡️' and current_page < total_pages:
+                    current_page += 1
+                    await message.edit(embed=get_page_embed(current_page))
+                
+                elif str(reaction.emoji) == '⏪':  # First page
+                    current_page = 1
+                    await message.edit(embed=get_page_embed(current_page))
+                    
+                elif str(reaction.emoji) == '⏩':  # Last page
+                    current_page = total_pages
+                    await message.edit(embed=get_page_embed(current_page))
+                    
+            except asyncio.TimeoutError:
+                # Remove reactions after timeout
+                try:
+                    await message.clear_reactions()
+                except:
+                    pass  # If bot doesn't have permissions to clear reactions
+                break
 
-        await ctx.send(embed=BXembed)
+
+@client.command(aliases=["v", "info", "pokemon"])
+async def view(ctx, number: int = None, user: discord.Member = None):
+    if user == None:
+        user = ctx.author
+    
+    # If no number provided, show usage instructions
+    if number is None:
+        usage_embed = discord.Embed(
+            title="Pokemon View Command Usage",
+            description="Use this command to view detailed information about a specific Pokemon in your box.",
+            color=discord.Colour.blue()
+        )
+        usage_embed.add_field(
+            name="How to Use",
+            value="`%view [number]` - View details of Pokemon by its box number\n" +
+                  "Example: `%view 7` to view Pokemon #7\n\n" +
+                  "You can find Pokemon numbers in your box view (`%box` command).\n" +
+                  "Each Pokemon is numbered sequentially across all pages.",
+            inline=False
+        )
+        usage_embed.add_field(
+            name="Alternatives",
+            value="You can also use `%v`, `%info`, or `%pokemon` instead of `%view`.",
+            inline=False
+        )
+        await ctx.send(embed=usage_embed)
+        return
+    
+    with open("Inventory.json", "r") as file:
+        data = json.load(file)
+
+        if str(user.id) not in data["users"]:
+            await ctx.send("You have not begun your adventure! Start by using the `%start` command.")
+            return
+
+        elif data["users"][str(user.id)]["caught_pokemon"] == []:
+            await ctx.send("You have not caught any pokemon! Try using the `%s` command")
+            return
+        
+        caught_id_list = data["users"][str(user.id)]["caught_pokemon"]
+        total_pokemon = len(caught_id_list)
+        
+        # Validate the number
+        if number < 1 or number > total_pokemon:
+            await ctx.send(f"Pokemon #{number} doesn't exist in your box. You have {total_pokemon} Pokemon (numbered 1-{total_pokemon}).")
+            return
+        
+        # Get the Pokemon unique ID (adjusting for 0-based indexing)
+        pokemon_id = caught_id_list[number - 1]
+        pokemon = search_pokemon_by_unique_id(str(pokemon_id))
+        
+        # Calculate which page this Pokemon is on (for reference)
+        pokemon_per_page = 12
+        page = ((number - 1) // pokemon_per_page) + 1
+        position = ((number - 1) % pokemon_per_page) + 1
+        
+        # Get Pokemon details
+        name = pokemon["name"].capitalize().replace('-', ' ')
+        shiny = pokemon["shiny"]
+        level = pokemon["level"]
+
+        result = search_pokemon_by_id(pokemon["pokedex_id"])
+        
+        # Get sprite URL from the original Pokemon data
+        if shiny and result and "sprites" in result and "front_shiny" in result["sprites"]:
+            sprite_url = result["sprites"]["front_shiny"]
+            name = f"{name} ⭐"
+        elif result and "sprites" in result and "front_default" in result["sprites"]:
+            sprite_url = result["sprites"]["front_default"]
+        else:
+            sprite_url = None
+        
+        # Get types and color from the original Pokemon data
+        type_list = result["types"] if "types" in result else []
+        type_str = ", ".join([t.capitalize() for t in type_list])
+        colour = get_type_colour(type_str.split(','))
+        
+        # Create embed
+        view_embed = discord.Embed(
+            title=f"{name} - Level {level}",
+            color=colour
+        )
+        
+        # Add sprite as the main image rather than thumbnail for better visibility
+        if sprite_url:
+            view_embed.set_image(url=sprite_url)
+        
+        # Add Pokemon info
+        view_embed.add_field(name="Type", value=type_str or "Unknown", inline=True)
+        view_embed.add_field(name="Pokedex ID", value=f"#{pokemon['pokedex_id']}" if "pokedex_id" in pokemon else "Unknown", inline=True)
+        view_embed.add_field(name="Unique ID", value=pokemon_id, inline=True)
+        
+        # Add IVs if available
+        if "ivs" in pokemon and isinstance(pokemon["ivs"], dict):
+            ivs = pokemon["ivs"]
+            iv_str = ""
+            total_iv = 0
+            
+            for stat, value in ivs.items():
+                iv_str += f"{stat.capitalize()}: {value}\n"
+                total_iv += value
+            
+            view_embed.add_field(name="IVs", value=iv_str, inline=True)
+            view_embed.add_field(name="Total IV", value=f"{total_iv}/186", inline=True)
+        
+        # Add moves if available
+        if "moves" in pokemon and isinstance(pokemon["moves"], list) and len(pokemon["moves"]) > 0:
+            moves_str = ", ".join([m.capitalize().replace('-', ' ') for m in pokemon["moves"]])
+            view_embed.add_field(name="Moves", value=moves_str, inline=False)
+        
+        # Add the description if available
+        if "description" in pokemon:
+            description = pokemon["description"].replace("\n", " ")
+            view_embed.add_field(name="Description", value=description, inline=False)
+            
+        # Add evolution information if available
+        if "evolution_line" in pokemon:
+            evolution_line = pokemon["evolution_line"]
+            next_evolution = get_next_evolution(evolution_line, pokemon["name"]).capitalize() if callable(get_next_evolution) else "Unknown"
+            view_embed.add_field(name="Evolves Into", value=next_evolution, inline=True)
+        
+        view_embed.set_footer(text=f"Caught by {user.name} | Use '%box {page}' to return to the box view")
+        
+        await ctx.send(embed=view_embed)
 
 @client.command(aliases = ["bal"])
 async def balance(ctx):

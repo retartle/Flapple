@@ -2447,5 +2447,129 @@
    "special-defense": 31,
    "speed": 30
   }
+ },
+ "000080": {
+  "unique_id": "000080",
+  "pokedex_id": 71,
+  "name": "victreebel",
+  "shiny": false,
+  "level": 4,
+  "ivs": {
+   "hp": 0,
+   "attack": 30,
+   "defense": 24,
+   "special-attack": 18,
+   "special-defense": 29,
+   "speed": 28
+  },
+  "base_stats": {
+   "hp": 80,
+   "attack": 105,
+   "defense": 65,
+   "special-attack": 100,
+   "special-defense": 70,
+   "speed": 70
+  },
+  "final_stats": {
+   "hp": 11,
+   "attack": 14,
+   "defense": 11,
+   "special-attack": 13,
+   "special-defense": 11,
+   "speed": 11
+  }
+ },
+ "000081": {
+  "unique_id": "000081",
+  "pokedex_id": 990,
+  "name": "iron-treads",
+  "shiny": false,
+  "level": 18,
+  "ivs": {
+   "hp": 4,
+   "attack": 13,
+   "defense": 31,
+   "special-attack": 5,
+   "special-defense": 24,
+   "speed": 30
+  },
+  "base_stats": {
+   "hp": 90,
+   "attack": 112,
+   "defense": 120,
+   "special-attack": 72,
+   "special-defense": 70,
+   "speed": 106
+  },
+  "final_stats": {
+   "hp": 38,
+   "attack": 47,
+   "defense": 53,
+   "special-attack": 31,
+   "special-defense": 34,
+   "speed": 48
+  }
+ },
+ "000082": {
+  "unique_id": "000082",
+  "pokedex_id": 317,
+  "name": "swalot",
+  "shiny": false,
+  "level": 13,
+  "ivs": {
+   "hp": 3,
+   "attack": 13,
+   "defense": 29,
+   "special-attack": 25,
+   "special-defense": 23,
+   "speed": 17
+  },
+  "base_stats": {
+   "hp": 100,
+   "attack": 73,
+   "defense": 83,
+   "special-attack": 73,
+   "special-defense": 83,
+   "speed": 55
+  },
+  "final_stats": {
+   "hp": 31,
+   "attack": 25,
+   "defense": 30,
+   "special-attack": 27,
+   "special-defense": 29,
+   "speed": 21
+  }
+ },
+ "000083": {
+  "unique_id": "000083",
+  "pokedex_id": 140,
+  "name": "kabuto",
+  "shiny": false,
+  "level": 12,
+  "ivs": {
+   "hp": 18,
+   "attack": 4,
+   "defense": 9,
+   "special-attack": 8,
+   "special-defense": 24,
+   "speed": 29
+  },
+  "base_stats": {
+   "hp": 30,
+   "attack": 80,
+   "defense": 90,
+   "special-attack": 55,
+   "special-defense": 45,
+   "speed": 55
+  },
+  "final_stats": {
+   "hp": 14,
+   "attack": 24,
+   "defense": 27,
+   "special-attack": 19,
+   "special-defense": 18,
+   "speed": 21
+  }
  }
 }
