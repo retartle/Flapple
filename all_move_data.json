@@ -8961,8 +8961,8 @@
         "pp": 10,
         "type": "ground",
         "damage_class": "special",
-        "effect": "Inflicts regular damage.",
-        "short_effect": "Inflicts regular damage with no additional effect."
+        "effect": "Inflicts regular damage.  Has a 30% chance to burn the target.",
+        "short_effect": "Has a 30% chance to burn the target."
     },
     {
         "id": 816,
