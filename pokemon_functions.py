@@ -3,6 +3,8 @@ import random
 from random import randint
 import asyncio
 import aiohttp
+import discord
+
 
 
 # Simple cache to store URL validity checks
@@ -163,6 +165,64 @@ def get_type_colour(type):
 
     return colour
 
+async def rename_pokemon(ctx, unique_id, new_name):
+    """
+    Rename a Pokemon in the caught_pokemon_data.json file
+    
+    Parameters:
+    ctx - Discord context
+    unique_id - Unique ID of the Pokemon to rename
+    new_name - New name for the Pokemon
+    
+    Returns:
+    bool - True if successful, False otherwise
+    """
+    try:
+        with open('caught_pokemon_data.json', 'r+') as file:
+            pokemon_data = json.load(file)
+            
+            # Make sure the Pokemon exists
+            if unique_id not in pokemon_data:
+                error_embed = discord.Embed(
+                    title="Pokémon Not Found",
+                    description=f"Pokémon with ID {unique_id} not found!",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=error_embed)
+                return False
+            
+            # Limit name length to prevent abuse
+            if len(new_name) > 20:
+                error_embed = discord.Embed(
+                    title="Name Too Long",
+                    description="Pokémon name must be 20 characters or less!",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=error_embed)
+                return False
+                
+            # Store original name for reference
+            original_name = pokemon_data[unique_id]["name"]
+            
+            # Add nickname field
+            pokemon_data[unique_id]["nickname"] = new_name
+            
+            # Write back to file
+            file.seek(0)
+            json.dump(pokemon_data, file, indent=1)
+            file.truncate()
+            
+            return True
+            
+    except Exception as e:
+        error_embed = discord.Embed(
+            title="Error",
+            description=f"Error renaming Pokémon: {str(e)}",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=error_embed)
+        return False
+
 def choose_random_wild(normal_ID_list, mythical_ID_list, legendary_ID_list):
     rarity_choice = random.choices(
         ["normal", "mythical", "legendary"],
@@ -187,123 +247,194 @@ def choose_random_wild(normal_ID_list, mythical_ID_list, legendary_ID_list):
 
     return pokemon, shiny
 
-async def search_cmd_handler(client, ctx, name, SHembed_editor):
-    code = 0
-    rate = None
-    catch_result = None
-    catch = None
-    earnings = None
-
-    file = open("inventory.json", "r+")
-    data = json.load(file)
-    file.seek(0)
-
-    pokedollars = data["users"][str(ctx.author.id)]["Pokedollars"]
-    pokeballs = data["users"][str(ctx.author.id)]["Pokeballs"]
-    greatballs = data["users"][str(ctx.author.id)]["Greatballs"]
-    ultraballs = data["users"][str(ctx.author.id)]["Ultraballs"]
-    masterballs = data["users"][str(ctx.author.id)]["Masterballs"]
-
-    if pokeballs <= 0 and greatballs <= 0 and ultraballs <= 0 and masterballs <= 0:
-        await ctx.send(f"You don't have any Pokeballs! You could only watch as {name} fled.")
-        await update_embed_title(SHembed_editor, f"{name} fled!")
-        return code, catch_result, catch, rate, earnings
-
-    ball_file = open("pokeballs.json", "r")
-    ball_data = json.load(ball_file)
-    ball_file.close()
-
-    pokemon_data = search_pokemon_by_name(name)
-
-    if pokemon_data is None:
-        await ctx.send(f"Could not find a Pokémon named '{name}'. Please check the spelling.")
-        await update_embed_title(SHembed_editor, f"{name} fled!")
-        return 0, None, None, None, None
-
-    base_catch_rate = pokemon_data["catch_rate"]
-
-    earnings = random.randint(50, 150)
-    flee_chance = 40
-
-    while True:
-        def check(msg):
-            return msg.author == ctx.author and msg.channel == ctx.channel and msg.content
-
-        try:
-            msg = await client.wait_for("message", check=check, timeout=60.0)
-        except asyncio.TimeoutError:
-            await ctx.send(f"You took too long to throw a ball! {name} fled!")
-            await update_embed_title(SHembed_editor, f"{name} fled!")
-            return code, catch_result, catch, rate, earnings
-
-        if msg.content.lower() in ["pokeball", "pb"]:
-            if pokeballs <= 0:
-                await ctx.send("You don't have enough Pokeballs!")
-                continue
-            pokeballs -= 1
-            ball_multiplier = ball_data["Pokeball"]
-
-        elif msg.content.lower() in ["greatball", "gb"]:
-            if greatballs <= 0:
-                await ctx.send("You don't have enough Greatballs!")
-                continue
-            greatballs -= 1
-            ball_multiplier = ball_data["Greatball"]
-
-        elif msg.content.lower() in ["ultraball", "ub"]:
-            if ultraballs <= 0:
-                await ctx.send("You don't have enough Ultraballs!")
-                continue
-            ultraballs -= 1
-            ball_multiplier = ball_data["Ultraball"]
-
-        elif msg.content.lower() in ["masterball", "mb"]:
-            if masterballs <= 0:
-                await ctx.send("You don't have enough Masterballs!")
-                continue
-            masterballs -= 1
-            ball_multiplier = ball_data["Masterball"]
-
-        elif msg.content.lower() in ["run"]:
-            await update_embed_title(SHembed_editor, f"Got away from {name} safely.")
-            code = 1
+async def search_cmd_handler(client, ctx, name, SHembed_editor, active_catchers):
+    try:
+        code = 0
+        rate = None
+        catch_result = None
+        catch = None
+        earnings = None
+        
+        # Use with statement for better file handling
+        with open("Inventory.json", "r+") as file:
+            data = json.load(file)
+            
+            pokedollars = data["users"][str(ctx.author.id)]["Pokedollars"]
+            pokeballs = data["users"][str(ctx.author.id)]["Pokeballs"]
+            greatballs = data["users"][str(ctx.author.id)]["Greatballs"]
+            ultraballs = data["users"][str(ctx.author.id)]["Ultraballs"]
+            masterballs = data["users"][str(ctx.author.id)]["Masterballs"]
+            
+            if pokeballs <= 0 and greatballs <= 0 and ultraballs <= 0 and masterballs <= 0:
+                error_embed = discord.Embed(
+                    title="No Pokéballs",
+                    description=f"You don't have any Pokéballs! You could only watch as {name} fled.",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=error_embed)
+                await update_embed_title(SHembed_editor, f"{name} fled!")
+                return code, catch_result, catch, rate, earnings
+            
+            # Load ball data
+            with open("pokeballs.json", "r") as ball_file:
+                ball_data = json.load(ball_file)
+            
+            pokemon_data = search_pokemon_by_name(name)
+            if pokemon_data is None:
+                error_embed = discord.Embed(
+                    title="Pokémon Not Found",
+                    description=f"Could not find a Pokémon named '{name}'. Please check the spelling.",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=error_embed)
+                await update_embed_title(SHembed_editor, f"{name} fled!")
+                return 0, None, None, None, None
+            
+            base_catch_rate = pokemon_data["catch_rate"]
+            earnings = random.randint(50, 150)
+            flee_chance = 40
+            
+            while True:
+                def check(msg):
+                    # Modified check to ignore command messages
+                    return (
+                        msg.author == ctx.author and
+                        msg.channel == ctx.channel and
+                        msg.content and
+                        not msg.content.startswith("%")  # Ignore command messages
+                    )
+                
+                try:
+                    msg = await client.wait_for("message", check=check, timeout=60.0)
+                except asyncio.TimeoutError:
+                    error_embed = discord.Embed(
+                        title="Timeout",
+                        description=f"You took too long to throw a ball! {name} fled!",
+                        color=discord.Color.red()
+                    )
+                    await ctx.send(embed=error_embed)
+                    await update_embed_title(SHembed_editor, f"{name} fled!")
+                    return code, catch_result, catch, rate, earnings
+                
+                # Process pokeball selection
+                if msg.content.lower() in ["pokeball", "pb"]:
+                    if pokeballs <= 0:
+                        error_embed = discord.Embed(
+                            title="Not Enough Pokéballs",
+                            description="You don't have enough Pokéballs!",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=error_embed)
+                        continue
+                    pokeballs -= 1
+                    ball_multiplier = ball_data["Pokeball"]
+                elif msg.content.lower() in ["greatball", "gb"]:
+                    if greatballs <= 0:
+                        error_embed = discord.Embed(
+                            title="Not Enough Greatballs",
+                            description="You don't have enough Greatballs!",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=error_embed)
+                        continue
+                    greatballs -= 1
+                    ball_multiplier = ball_data["Greatball"]
+                elif msg.content.lower() in ["ultraball", "ub"]:
+                    if ultraballs <= 0:
+                        error_embed = discord.Embed(
+                            title="Not Enough Ultraballs",
+                            description="You don't have enough Ultraballs!",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=error_embed)
+                        continue
+                    ultraballs -= 1
+                    ball_multiplier = ball_data["Ultraball"]
+                elif msg.content.lower() in ["masterball", "mb"]:
+                    if masterballs <= 0:
+                        error_embed = discord.Embed(
+                            title="Not Enough Masterballs",
+                            description="You don't have enough Masterballs!",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=error_embed)
+                        continue
+                    masterballs -= 1
+                    ball_multiplier = ball_data["Masterball"]
+                elif msg.content.lower() in ["run"]:
+                    await update_embed_title(SHembed_editor, f"Got away from {name} safely.")
+                    code = 1
+                    # Properly save before exiting
+                    file.seek(0)
+                    json.dump(data, file, indent=1)
+                    file.truncate()
+                    catch_result = "ran"
+                    return code, catch_result, catch, rate, earnings
+                else:
+                    # Only show this message during a valid catch sequence, not during errors
+                    error_embed = discord.Embed(
+                        title="Invalid Input",
+                        description="Enter a pokeball name to use it (pokeball, greatball, ultraball, masterball or run to flee).",
+                        color=discord.Color.red()
+                    )
+                    await ctx.send(embed=error_embed)
+                    continue
+                
+                # Update user's inventory with new ball counts
+                data["users"][str(ctx.author.id)]["Pokeballs"] = pokeballs
+                data["users"][str(ctx.author.id)]["Greatballs"] = greatballs
+                data["users"][str(ctx.author.id)]["Ultraballs"] = ultraballs
+                data["users"][str(ctx.author.id)]["Masterballs"] = masterballs
+                
+                # Calculate catch chance
+                modified_catch_rate = base_catch_rate * ball_multiplier
+                catch = random.randint(0, 255)
+                
+                # Handle catch outcome
+                if catch <= modified_catch_rate:
+                    catch_result = True
+                    data["users"][str(ctx.author.id)]["Pokedollars"] = pokedollars + earnings
+                    # Always save changes to file
+                    file.seek(0)
+                    json.dump(data, file, indent=1)
+                    file.truncate()
+                    code = 1
+                    break
+                elif random.randint(1, 100) <= flee_chance:
+                    await update_embed_title(SHembed_editor, f"{name} fled!")
+                    catch_result = "ran"
+                    # Always save changes to file
+                    file.seek(0)
+                    json.dump(data, file, indent=1)
+                    file.truncate()
+                    code = 1
+                    break
+                else:
+                    random_retry_msg = random.choice([f"Argh so close! {name} broke free!", f"Not even close! {name} broke free!"])
+                    await update_embed_title(SHembed_editor, random_retry_msg)
+                
+                # Always save after each action
+                file.seek(0)
+                json.dump(data, file, indent=1)
+                file.truncate()
+            
+            # Final save before returning
             file.seek(0)
             json.dump(data, file, indent=1)
             file.truncate()
-            file.close()
-            catch_result = "ran"
-            return code, catch_result, catch, rate, earnings
-
-        else:
-            await ctx.send("Enter a pokeball name to use it.")
-            continue
-
-        data["users"][str(ctx.author.id)]["Pokeballs"] = pokeballs
-        data["users"][str(ctx.author.id)]["Greatballs"] = greatballs
-        data["users"][str(ctx.author.id)]["Ultraballs"] = ultraballs
-        data["users"][str(ctx.author.id)]["Masterballs"] = masterballs
-
-        modified_catch_rate = base_catch_rate * ball_multiplier
-        catch = random.randint(0, 255)
-
-        if catch <= modified_catch_rate:
-            catch_result = True
-            data["users"][str(ctx.author.id)]["Pokedollars"] = pokedollars + earnings
-            json.dump(data, file, indent=1)
-            code = 1
-            break
-        elif random.randint(1, 100) <= flee_chance:
-            await update_embed_title(SHembed_editor, f"{name} fled!")
-            catch_result = "ran"
-            json.dump(data, file, indent=1)
-            code = 1
-            break
-        else:
-            random_retry_msg = random.choice([f"Argh so close! {name} broke free!", f"Not even close! {name} broke free!"])
-            await update_embed_title(SHembed_editor, random_retry_msg)
-
-    file.seek(0)
-    json.dump(data, file, indent=1)
-    file.truncate()
-    file.close()
-    return code, catch_result, catch, modified_catch_rate, earnings
+        
+        return code, catch_result, catch, modified_catch_rate, earnings
+    
+    except Exception as e:
+        # Handle any unexpected errors
+        error_embed = discord.Embed(
+            title="Error Occurred",
+            description=f"An error occurred during your catch attempt: {str(e)}",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=error_embed)
+        return 0, None, None, None, None
+    
+    finally:
+        # Always remove the user from active catchers, regardless of outcome
+        active_catchers.discard(ctx.author.id)

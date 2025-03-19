@@ -38,13 +38,14 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
         "speed": generate_iv()
     }
 
-    unique_id = generate_unique_id()  # Generate a new unique identifier
-
+    unique_id = generate_unique_id()
+    
     # Store full Pokémon data separately in "caught_pokemon_data.json"
     caught_pokemon = {
         "unique_id": unique_id,
         "pokedex_id": pokemon_data["id"],
         "name": pokemon_data["name"],
+        "nickname": None,  # Add nickname field, default to None
         "shiny": shiny,
         "level": level,
         "ivs": ivs,
@@ -64,7 +65,8 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
         try:
             data = json.load(file)
         except json.JSONDecodeError:
-            data = {}  # If the file is empty or invalid, start with an empty dictionary
+            data = {} # If the file is empty or invalid, start with an empty dictionary
+
         data[unique_id] = caught_pokemon
         file.seek(0)
         json.dump(data, file, indent=1)
@@ -75,12 +77,11 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
         try:
             inventory = json.load(file)
         except json.JSONDecodeError:
-            inventory = {"users": {}}  # Ensure a valid structure
+            inventory = {"users": {}} # Ensure a valid structure
 
         # Ensure the user's data exists
         if "users" not in inventory:
             inventory["users"] = {}
-
         if str(user_id) not in inventory["users"]:
             inventory["users"][str(user_id)] = {"caught_pokemon": []}
 
@@ -89,9 +90,8 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
             inventory["users"][str(user_id)]["caught_pokemon"] = []
 
         inventory["users"][str(user_id)]["caught_pokemon"].append(unique_id)
-
         file.seek(0)
         json.dump(inventory, file, indent=1)
         file.truncate()
 
-    return unique_id  # Return the unique ID of the caught Pokémon
+    return unique_id # Return the unique ID of the caught Pokémon

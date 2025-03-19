@@ -1,30 +1,19 @@
 {
  "users": {
   "505213604023500810": {
-   "Pokeballs": 7,
+   "Pokeballs": 16,
    "Greatballs": 0,
    "Ultraballs": 0,
    "Masterballs": 0,
-   "Pokedollars": 10392,
+   "Pokedollars": 10430,
    "caught_pokemon": [
+    "000001",
+    "000002",
+    "000003",
     "000004",
-    "000005",
-    "000007",
-    "000009",
-    "000010"
+    "000005"
    ],
-   "partner_pokemon": "000004"
-  },
-  "786083062172745770": {
-   "Pokeballs": 20,
-   "Greatballs": 0,
-   "Ultraballs": 0,
-   "Masterballs": 0,
-   "Pokedollars": 10000,
-   "caught_pokemon": [
-    "000006"
-   ],
-   "partner_pokemon": "000006"
+   "partner_pokemon": "000005"
   }
  }
 }
