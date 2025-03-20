@@ -1,13 +1,5 @@
-import json
-
-def load_moves_into_dict():
-    with open('all_move_data.json', 'r') as file:
-        move_data = json.load(file)
-    
-    move_dict = {move['name']: move for move in move_data}
-    return move_dict
-
 def search_move_by_name(move):
-    dict = load_moves_into_dict()
-    results = dict.get(move, None)
-    return results
+    from main import move_collection
+    move_name = move.lower().replace(' ', '-')
+    result = move_collection.find_one({"name": move_name})
+    return result

@@ -111,15 +111,19 @@ async def preview_and_select_starter(ctx, client, chosen_generation, starter_pok
             return chosen_starter
 
 def set_user_starter(ctx, starter):
-    """
-    Determines if the starter is shiny (realistic chance ~1/4096),
-    stores it as the user's partner, and returns just the unique_id.
-    """
-    # Realistic shiny chance: approximately 1 in 4096
+    from main import inventory_collection
     is_shiny = random.choices([True, False], weights=[1, 4095], k=1)[0]
     full_starter_data = search_pokemon_by_id(starter["id"])
     unique_id = store_caught_pokemon(full_starter_data, str(ctx.author.id), is_shiny, 5)
-    return unique_id  # Return just the unique_id
+    
+    # Update user's inventory in MongoDB
+    inventory_collection.update_one(
+        {"_id": str(ctx.author.id)},
+        {"$push": {"caught_pokemon": unique_id}, "$set": {"partner_pokemon": unique_id}},
+        upsert=True
+    )
+    
+    return unique_id
 
 async def create_starter_summary_embed(ctx, starter, full_data, unique_id, is_shiny):
     """

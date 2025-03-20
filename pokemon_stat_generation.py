@@ -1,34 +1,31 @@
 import json
 import random
 import os
+from pymongo import MongoClient
 
 def generate_iv():
     return random.randint(0, 31)
 
-def calculate_stat(base, iv, level, ev=0, nature=1):
-    return int((((2 * base + iv + (ev // 4)) * level) // 100 + 5) * nature) #got this calculation from chatgpt dont ask me what this is
+def calculate_stat(base, iv, level, ev=0, nature=1, is_hp=False):
+    if is_hp:
+        # HP formula: floor((2 * B + I + E) * L / 100 + L + 10)
+        return int((2 * base + iv + (ev // 4)) * level // 100 + level + 10)
+    else:
+        # Other stats: floor(floor((2 * B + I + E) * L / 100 + 5) * N)
+        return int((((2 * base + iv + (ev // 4)) * level) // 100 + 5) * nature)
 
 def generate_unique_id():
-    # Path to the file storing the last used ID
-    last_id_file = "last_unique_id.txt"
-    
-    # Read the last used ID
-    if os.path.exists(last_id_file):
-        with open(last_id_file, "r") as file:
-            last_id = int(file.read().strip())
-    else:
-        last_id = 0
-
-    # Increment the last used ID
-    new_id = last_id + 1
-
-    # Update the last used ID in the file
-    with open(last_id_file, "w") as file:
-        file.write(str(new_id).zfill(6))  # Ensure the ID is zero-padded to 6 digits
-
-    return str(new_id).zfill(6)  # Return the new ID as a zero-padded string
+    from main import unique_id_collection
+    result = unique_id_collection.find_one_and_update(
+        {},
+        {"$inc": {"last_id": 1}},
+        upsert=True,
+        return_document=True
+    )
+    return str(result["last_id"]).zfill(6)
 
 def store_caught_pokemon(pokemon_data, user_id, shiny, level):
+    from main import inventory_collection, pokemon_collection
     ivs = {
         "hp": generate_iv(),
         "attack": generate_iv(),
@@ -39,59 +36,35 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
     }
 
     unique_id = generate_unique_id()
-    
-    # Store full Pokémon data separately in "caught_pokemon_data.json"
+
     caught_pokemon = {
-        "unique_id": unique_id,
+        "_id": unique_id,
         "pokedex_id": pokemon_data["id"],
         "name": pokemon_data["name"],
-        "nickname": None,  # Add nickname field, default to None
+        "nickname": None,
         "shiny": shiny,
         "level": level,
         "ivs": ivs,
         "base_stats": pokemon_data["stats"],
         "final_stats": {
-            "hp": calculate_stat(pokemon_data["stats"]["hp"], ivs["hp"], level),
+            "hp": calculate_stat(pokemon_data["stats"]["hp"], ivs["hp"], level, is_hp=True),
             "attack": calculate_stat(pokemon_data["stats"]["attack"], ivs["attack"], level),
             "defense": calculate_stat(pokemon_data["stats"]["defense"], ivs["defense"], level),
             "special-attack": calculate_stat(pokemon_data["stats"]["special-attack"], ivs["special-attack"], level),
             "special-defense": calculate_stat(pokemon_data["stats"]["special-defense"], ivs["special-defense"], level),
             "speed": calculate_stat(pokemon_data["stats"]["speed"], ivs["speed"], level)
-        }
+        },
+        "xp": 0
     }
 
-    # Save the caught Pokémon data in "caught_pokemon_data.json"
-    with open("caught_pokemon_data.json", "r+") as file:
-        try:
-            data = json.load(file)
-        except json.JSONDecodeError:
-            data = {} # If the file is empty or invalid, start with an empty dictionary
+    # Insert the caught Pokémon data into MongoDB
+    pokemon_collection.insert_one(caught_pokemon)
 
-        data[unique_id] = caught_pokemon
-        file.seek(0)
-        json.dump(data, file, indent=1)
-        file.truncate()
+    # Update the user's inventory in MongoDB
+    inventory_collection.update_one(
+        {"_id": str(user_id)},
+        {"$push": {"caught_pokemon": unique_id}},
+        upsert=True
+    )
 
-    # Update the user's inventory in "Inventory.json"
-    with open("Inventory.json", "r+") as file:
-        try:
-            inventory = json.load(file)
-        except json.JSONDecodeError:
-            inventory = {"users": {}} # Ensure a valid structure
-
-        # Ensure the user's data exists
-        if "users" not in inventory:
-            inventory["users"] = {}
-        if str(user_id) not in inventory["users"]:
-            inventory["users"][str(user_id)] = {"caught_pokemon": []}
-
-        # Store only the unique_id inside "caught_pokemon"
-        if "caught_pokemon" not in inventory["users"][str(user_id)]:
-            inventory["users"][str(user_id)]["caught_pokemon"] = []
-
-        inventory["users"][str(user_id)]["caught_pokemon"].append(unique_id)
-        file.seek(0)
-        json.dump(inventory, file, indent=1)
-        file.truncate()
-
-    return unique_id # Return the unique ID of the caught Pokémon
+    return unique_id
