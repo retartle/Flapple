@@ -5,9 +5,12 @@ import time
 from random import randint
 from dotenv import load_dotenv
 from discord.ext import commands
+
 from move_functions import *
 from pokemon_functions import *
 from pokemon_stat_generation import *
+from trainer_functions import *
+
 import asyncio
 from pymongo import MongoClient
 
@@ -106,13 +109,16 @@ async def ping(ctx):
 @client.command()
 async def start(ctx):
     user_id = str(ctx.author.id)
-    
     try:
         # Check if user already exists
         user_data = inventory_collection.find_one({"_id": user_id})
         
         if not user_data:
-            # New user setup
+            # Let user choose trainer sprite first
+            await ctx.send("Before you begin your journey, choose your trainer avatar!")
+            trainer_sprite = await select_trainer_sprite(ctx, client)
+            
+            # New user setup with trainer sprite
             user_data = {
                 "_id": user_id,
                 "Pokeballs": 20,
@@ -121,7 +127,8 @@ async def start(ctx):
                 "Masterballs": 0,
                 "Pokedollars": 10000,
                 "caught_pokemon": [],
-                "partner_pokemon": None
+                "partner_pokemon": None,
+                "trainer_sprite": trainer_sprite  # Add this new field
             }
             
             # Import starter functions module
@@ -259,6 +266,132 @@ async def start(ctx):
             await ctx.send(f"Your adventure has just begun, Trainer {ctx.author.name}! You have received 20 Pokeballs and 10000 Pokedollars. Use `%search` to find a wild Pokémon!")
         else:
             await ctx.send("You have already begun your adventure! Start searching for wild Pokémon using `%search`")
+    
+    except Exception as e:
+        error_embed = discord.Embed(
+            title="Error",
+            description=f"An error occurred: {str(e)}",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=error_embed)
+
+@client.command(aliases=["p", "me"])
+async def profile(ctx, user: discord.Member = None):
+    """Display trainer profile with avatar, stats and partner"""
+    if user is None:
+        user = ctx.author
+    
+    user_id = str(user.id)
+    
+    try:
+        # Fetch user data from MongoDB
+        user_data = inventory_collection.find_one({"_id": user_id})
+        
+        if not user_data:
+            await ctx.send(f"{user.name} has not begun their adventure yet!")
+            return
+        
+        # Get trainer info
+        pokedollars = user_data.get("Pokedollars", 0)
+        caught_pokemon = user_data.get("caught_pokemon", [])
+        trainer_sprite = user_data.get("trainer_sprite", "red")  # Default if not set
+        
+        # Get partner Pokémon info
+        partner_id = user_data.get("partner_pokemon")
+        partner_info = "None"
+        
+        if partner_id:
+            partner = pokemon_collection.find_one({"_id": partner_id})
+            if partner:
+                name = partner["name"].capitalize().replace('-', ' ')
+                nickname = partner.get("nickname")
+                level = partner["level"]
+                
+                display_name = f"{nickname} ({name})" if nickname else name
+                if partner.get("shiny"):
+                    display_name += " ⭐"
+                
+                partner_info = f"{display_name} (Level {level})"
+                
+                # Get partner sprite for embed
+                pokemon_data = search_pokemon_by_id(partner["pokedex_id"])
+                partner_sprite = await get_best_sprite_url(pokemon_data, partner.get("shiny", False))
+        
+        # Create profile embed
+        embed = discord.Embed(
+            title=f"{user.name}'s Trainer Profile",
+            color=discord.Color.blue()
+        )
+        
+        # Set the trainer sprite as the thumbnail
+        sprite_url = f"https://play.pokemonshowdown.com/sprites/trainers/{trainer_sprite}.png"
+        embed.set_thumbnail(url=sprite_url)
+        
+        # Add user stats
+        embed.add_field(name="💰 Balance", value=f"{pokedollars:,} Pokedollars", inline=True)
+        embed.add_field(name="🏆 Pokémon Caught", value=f"{len(caught_pokemon)}", inline=True)
+        embed.add_field(name="🤝 Partner Pokémon", value=partner_info, inline=False)
+        
+        # Add partner sprite if available
+        if partner_id and partner_sprite:
+            embed.set_image(url=partner_sprite)
+        
+        # Add inventory section
+        inventory = f"**Pokeballs:** {user_data.get('Pokeballs', 0)}\n" \
+                   f"**Greatballs:** {user_data.get('Greatballs', 0)}\n" \
+                   f"**Ultraballs:** {user_data.get('Ultraballs', 0)}\n" \
+                   f"**Masterballs:** {user_data.get('Masterballs', 0)}"
+        embed.add_field(name="🎒 Inventory", value=inventory, inline=False)
+        
+        embed.set_footer(text="Use %box to view your Pokémon | %changesprite to change avatar")
+        
+        await ctx.send(embed=embed)
+    
+    except Exception as e:
+        error_embed = discord.Embed(
+            title="Error",
+            description=f"An error occurred: {str(e)}",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=error_embed)
+
+@client.command(aliases=["changesprite", "cs"])
+async def change_sprite(ctx):
+    """Change your trainer sprite"""
+    user_id = str(ctx.author.id)
+    
+    try:
+        # Check if user exists
+        user_data = inventory_collection.find_one({"_id": user_id})
+        
+        if not user_data:
+            await ctx.send("You have not begun your adventure! Start by using the `%start` command.")
+            return
+        
+        # Get current sprite for comparison
+        current_sprite = user_data.get("trainer_sprite", "red")
+        
+        # Let user choose a new sprite
+        await ctx.send("Choose your new trainer avatar!")
+        new_sprite = await select_trainer_sprite(ctx, client)
+        
+        # Update the sprite in MongoDB
+        inventory_collection.update_one(
+            {"_id": user_id},
+            {"$set": {"trainer_sprite": new_sprite}}
+        )
+        
+        # Confirmation message with new sprite
+        embed = discord.Embed(
+            title="Avatar Changed!",
+            description=f"Your trainer avatar has been updated to **{new_sprite}**.",
+            color=discord.Color.green()
+        )
+        
+        sprite_url = f"https://play.pokemonshowdown.com/sprites/trainers/{new_sprite}.png"
+        embed.set_image(url=sprite_url)
+        
+        await ctx.send(embed=embed)
     
     except Exception as e:
         error_embed = discord.Embed(
