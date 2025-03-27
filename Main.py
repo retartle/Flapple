@@ -114,21 +114,21 @@ async def start(ctx):
         user_data = inventory_collection.find_one({"_id": user_id})
         
         if not user_data:
+            message = await intro(ctx,client)
             # Let user choose trainer sprite first
-            await ctx.send("Before you begin your journey, choose your trainer avatar!")
-            trainer_sprite = await select_trainer_sprite(ctx, client)
+            trainer_sprite = await select_trainer_sprite(ctx, client, message)
             
             # New user setup with trainer sprite
             user_data = {
                 "_id": user_id,
-                "Pokeballs": 20,
+                "Pokeballs": 25,
                 "Greatballs": 0,
                 "Ultraballs": 0,
                 "Masterballs": 0,
-                "Pokedollars": 10000,
+                "Pokedollars": 5000,
                 "caught_pokemon": [],
                 "partner_pokemon": None,
-                "trainer_sprite": trainer_sprite  # Add this new field
+                "trainer_sprite": trainer_sprite
             }
             
             # Import starter functions module
@@ -139,11 +139,11 @@ async def start(ctx):
             
             # Outer loop: allow the user to reselect generation if needed
             while chosen_starter is None:
-                chosen_generation = await starter_functions.select_generation(ctx, client, starter_pokemon_generations)
+                chosen_generation = await starter_functions.select_generation(ctx, client, starter_pokemon_generations, message)
                 if chosen_generation is None:
                     return # Generation selection timed out
                 
-                chosen_starter = await starter_functions.preview_and_select_starter(ctx, client, chosen_generation, starter_pokemon_generations)
+                chosen_starter = await starter_functions.preview_and_select_starter(ctx, client, chosen_generation, starter_pokemon_generations, message)
                 if chosen_starter is None:
                     # User opted to reselect generation; loop again
                     continue
@@ -204,64 +204,10 @@ async def start(ctx):
             
             # Create and send the starter summary embed
             starter_embed = await starter_functions.create_starter_summary_embed(ctx, chosen_starter, full_pokemon_data, unique_id, is_shiny)
-            await ctx.send(embed=starter_embed)
+            await asyncio.sleep(2)
+            await message.edit(embed=starter_embed)
             
-            # Add nickname prompt
-            nickname_embed = discord.Embed(
-                title="Name Your Starter Pokémon",
-                description=f"Would you like to nickname your new {chosen_starter['name']}? Type a name or 'no' to skip.",
-                color=discord.Color.blue()
-            )
-            nickname_embed.set_footer(text="You have 30 seconds to respond")
-            await ctx.send(embed=nickname_embed)
-            
-            # Wait for nickname response
-            def check(msg):
-                return msg.author == ctx.author and msg.channel == ctx.channel and not msg.content.startswith("%")
-            
-            try:
-                nickname_msg = await client.wait_for("message", check=check, timeout=30.0)
-                nickname = nickname_msg.content.strip()
-                
-                # Skip if user declines
-                if nickname.lower() in ["no", "n", "skip"]:
-                    skip_embed = discord.Embed(
-                        title="Nickname Skipped",
-                        description=f"Keeping the name as {chosen_starter['name']}!",
-                        color=discord.Color.blue()
-                    )
-                    await ctx.send(embed=skip_embed)
-                else:
-                    # Try to rename the Pokemon
-                    if len(nickname) > 20:
-                        error_embed = discord.Embed(
-                            title="Name Too Long",
-                            description="Pokémon name must be 20 characters or less!",
-                            color=discord.Color.red()
-                        )
-                        await ctx.send(embed=error_embed)
-                    else:
-                        # Update the nickname in MongoDB
-                        result = pokemon_collection.update_one(
-                            {"_id": unique_id},
-                            {"$set": {"nickname": nickname}}
-                        )
-                        
-                        if result.modified_count > 0:
-                            success_embed = discord.Embed(
-                                title="Pokémon Nicknamed",
-                                description=f"Successfully renamed your {chosen_starter['name']} to \"{nickname}\"!",
-                                color=discord.Color.green()
-                            )
-                            await ctx.send(embed=success_embed)
-            
-            except asyncio.TimeoutError:
-                timeout_embed = discord.Embed(
-                    title="Nickname Timed Out",
-                    description=f"No nickname was provided in time. Keeping the name as {chosen_starter['name']}!",
-                    color=discord.Color.orange()
-                )
-                await ctx.send(embed=timeout_embed)
+            await prompt_for_nickname(ctx, chosen_starter['name'], unique_id)
             
             await ctx.send(f"Your adventure has just begun, Trainer {ctx.author.name}! You have received 20 Pokeballs and 10000 Pokedollars. Use `%search` to find a wild Pokémon!")
         else:
@@ -355,8 +301,8 @@ async def profile(ctx, user: discord.Member = None):
         )
         await ctx.send(embed=error_embed)
 
-@client.command(aliases=["changesprite", "cs"])
-async def change_sprite(ctx):
+@client.command(aliases=["changeavatar", "ca"])
+async def change_avatar(ctx):
     """Change your trainer sprite"""
     user_id = str(ctx.author.id)
     
@@ -780,6 +726,7 @@ async def search(ctx):
             description="You're already trying to catch a Pokémon! Complete your current encounter first.",
             color=discord.Color.red()
         )
+        error_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
         await ctx.send(embed=error_embed)
         return
 
@@ -792,6 +739,7 @@ async def search(ctx):
             description=f"Please retry in {round(retry_after)} seconds.",
             color=discord.Color.red()
         )
+        error_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
         await ctx.send(embed=error_embed)
         return
 
@@ -826,6 +774,7 @@ async def search(ctx):
             SHembed.add_field(name="Select a ball to use", value=f"Number of Pokeballs:{pb}\nNumber of Greatballs:{gb}\nNumber of Ultraballs:{ub}\nNumber of Masterballs:{mb}")
             SHembed.set_footer(text=f"{ctx.author.name}'s Battle")
             SHembed.set_image(url=sprite_url)
+            SHembed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
             SHembed_editor = await ctx.send(embed=SHembed)
 
             code, catch_result, catch, rate, earnings = await search_cmd_handler(client, ctx, name, SHembed_editor, active_catchers)
@@ -849,43 +798,7 @@ async def search(ctx):
 
                 result_message = await ctx.send(embed=RESULTembed)
 
-                nickname_embed = discord.Embed(
-                    title="Name Your Pokémon",
-                    description=f"Would you like to nickname your new {name}? Type a name or 'no' to skip.",
-                    color=discord.Color.blue()
-                )
-                nickname_embed.set_footer(text="You have 30 seconds to respond")
-                await ctx.send(embed=nickname_embed)
-
-                def check(msg):
-                    return msg.author == ctx.author and msg.channel == ctx.channel and not msg.content.startswith("%")
-
-                try:
-                    nickname_msg = await client.wait_for("message", check=check, timeout=30.0)
-                    nickname = nickname_msg.content.strip()
-
-                    if nickname.lower() in ["no", "n", "skip"]:
-                        skip_embed = discord.Embed(
-                            title="Nickname Skipped",
-                            description=f"Keeping the name as {name}!",
-                            color=discord.Color.blue()
-                        )
-                        await ctx.send(embed=skip_embed)
-                    else:
-                        if await rename_pokemon(ctx, unique_id, nickname):
-                            success_embed = discord.Embed(
-                                title="Pokémon Nicknamed",
-                                description=f"Successfully renamed your {name} to \"{nickname}\"!",
-                                color=discord.Color.green()
-                            )
-                            await ctx.send(embed=success_embed)
-                except asyncio.TimeoutError:
-                    timeout_embed = discord.Embed(
-                        title="Nickname Timed Out",
-                        description=f"No nickname was provided in time. Keeping the name as {name}!",
-                        color=discord.Color.orange()
-                    )
-                    await ctx.send(embed=timeout_embed)
+                await prompt_for_nickname(ctx, name, unique_id)
             else:
                 await update_embed_title(SHembed_editor, f"{name} escaped... It rolled a {catch} but you only had {rate}")
 

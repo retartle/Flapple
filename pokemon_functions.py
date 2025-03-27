@@ -4,6 +4,8 @@ from random import randint
 import asyncio
 import aiohttp
 import discord
+import os
+from pymongo import MongoClient
 
 # Simple cache to store URL validity checks
 sprite_cache = {}
@@ -157,60 +159,119 @@ def get_type_colour(type):
 
     return colour
 
-async def rename_pokemon(ctx, unique_id, new_name):
-    """
-    Rename a Pokemon in MongoDB
-    """
-    try:
-        # MongoDB version
-        from main import pokemon_collection
-        
-        # Check if the Pokémon exists
-        pokemon = pokemon_collection.find_one({"_id": unique_id})
-        if not pokemon:
-            error_embed = discord.Embed(
-                title="Pokémon Not Found",
-                description=f"Pokémon with ID {unique_id} not found!",
-                color=discord.Color.red()
+class RenameModal(discord.ui.Modal):
+    def __init__(self, pokemon_name, unique_id, **kwargs):
+        print("hello")
+        super().__init__(**kwargs)  # Make sure title and other kwargs are passed
+        self.pokemon_name = pokemon_name
+        self.unique_id = unique_id
+        self.interaction = None
+        self.add_item(discord.ui.TextInput(
+            label=f"New name for {pokemon_name}",
+            placeholder="Enter a nickname (16 characters max)",
+            max_length=16,
+            required=True
+        ))
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        self.interaction = interaction
+        nickname = self.children[0].value
+
+        try:
+            client = MongoClient(os.getenv('Mongo_API'))
+            pokemon_collection = client.flapple.caught_pokemon
+            result = pokemon_collection.update_one(
+                {"_id": self.unique_id},
+                {"$set": {"nickname": nickname}}
             )
-            await ctx.send(embed=error_embed)
-            return False
-        
-        # Limit name length to prevent abuse
-        if len(new_name) > 20:
-            error_embed = discord.Embed(
-                title="Name Too Long",
-                description="Pokémon name must be 20 characters or less!",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=error_embed)
-            return False
-        
-        # Update the nickname in MongoDB
-        result = pokemon_collection.update_one(
-            {"_id": unique_id},
-            {"$set": {"nickname": new_name}}
-        )
-        
-        if result.modified_count > 0:
-            return True
-        else:
-            error_embed = discord.Embed(
-                title="Update Failed",
-                description=f"Failed to update the nickname for Pokémon with ID {unique_id}.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=error_embed)
-            return False
             
-    except Exception as e:
-        error_embed = discord.Embed(
-            title="Error",
-            description=f"Error renaming Pokémon: {str(e)}",
+            if result.modified_count > 0:
+                success_embed = discord.Embed(
+                    title="Pokémon Nicknamed",
+                    description=f"Successfully renamed your {self.pokemon_name} to \"{nickname}\"!",
+                    color=discord.Color.green()
+                )
+                success_embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar)
+                await interaction.response.edit_message(embed=success_embed, view=None)
+            else:
+                error_embed = discord.Embed(
+                    title="Update Failed",
+                    description=f"Failed to update the nickname for Pokémon with ID {self.unique_id}.",
+                    color=discord.Color.red()
+                )
+                error_embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar)
+                await interaction.response.edit_message(embed=error_embed, view=None)
+        except Exception as e:
+            print(f"Error in on_submit: {str(e)}")
+            error_embed = discord.Embed(
+                title="Error",
+                description=f"Error renaming Pokémon: {str(e)}",
+                color=discord.Color.red()
+            )
+            error_embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar)
+            await interaction.response.edit_message(embed=error_embed, view=None)
+
+
+async def prompt_for_nickname(ctx, pokemon_name, unique_id):
+    nickname_complete = asyncio.Event()
+    rename_button = discord.ui.Button(style=discord.ButtonStyle.primary, label="Nickname this Pokémon")
+    skip_button = discord.ui.Button(style=discord.ButtonStyle.secondary, label="Skip Naming")
+
+    async def rename_callback(interaction):
+        if interaction.user.id != ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon to name!", ephemeral=True)
+            return
+        print(f"Opening RenameModal for Pokémon ID: {unique_id}")
+        modal = RenameModal(
+            title="Name Your Pokémon",
+            pokemon_name=pokemon_name,
+            unique_id=unique_id
+        )
+        await interaction.response.send_modal(modal)
+        nickname_complete.set()
+        
+
+    async def skip_callback(interaction):
+        if interaction.user.id != ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon!", ephemeral=True)
+            return
+        skip_embed = discord.Embed(
+            title="Nickname Skipped",
+            description=f"Keeping the name as {pokemon_name}!",
+            color=discord.Color.blue()
+        )
+        skip_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
+        await interaction.response.edit_message(embed=skip_embed, view=None)
+        nickname_complete.set()
+
+    rename_button.callback = rename_callback
+    skip_button.callback = skip_callback
+
+    view = discord.ui.View(timeout=60)
+    view.add_item(rename_button)
+    view.add_item(skip_button)
+
+    nickname_embed = discord.Embed(
+        title="Name Your Pokémon",
+        description=f"Would you like to nickname your new {pokemon_name}?",
+        color=discord.Color.blue()
+    )
+    nickname_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
+    message = await ctx.send(embed=nickname_embed, view=view)
+
+    try:
+        await asyncio.wait_for(nickname_complete.wait(), timeout=60.0)
+        
+    except asyncio.TimeoutError:
+        timeout_embed = discord.Embed(
+            title="Name Your Pokemon",
+            description=f"You took too long to respond, keeping the name as {pokemon_name}",
             color=discord.Color.red()
         )
-        await ctx.send(embed=error_embed)
-        return False
+        timeout_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
+
+        await message.edit(embed=timeout_embed, view=None)
+
 
 def choose_random_wild(normal_ID_list, mythical_ID_list, legendary_ID_list):
     rarity_choice = random.choices(
