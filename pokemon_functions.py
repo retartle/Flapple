@@ -118,6 +118,12 @@ async def get_best_sprite_url(pokemon_data, shiny=False):
                 return url
 
     return None
+
+def get_emoji(ball_type):
+    """Retrieve an emoji for a given ball type"""
+    from main import db
+    emoji_data = db.emojis.find_one({"_id": ball_type})
+    return emoji_data["emoji"] if emoji_data else None
     
 def get_type_colour(type):
     if type[0] == "Grass":
@@ -161,7 +167,6 @@ def get_type_colour(type):
 
 class RenameModal(discord.ui.Modal):
     def __init__(self, pokemon_name, unique_id, **kwargs):
-        print("hello")
         super().__init__(**kwargs)  # Make sure title and other kwargs are passed
         self.pokemon_name = pokemon_name
         self.unique_id = unique_id
@@ -297,184 +302,252 @@ def choose_random_wild(normal_ID_list, mythical_ID_list, legendary_ID_list):
 
     return pokemon, shiny
 
-async def search_cmd_handler(client, ctx, name, SHembed_editor, active_catchers):
-    from main import inventory_collection, config_collection
-    try:
-        code = 0
-        rate = None
-        catch_result = None
-        catch = None
-        earnings = None
+class PokemonEncounterView(discord.ui.View):
+    def __init__(self, ctx, name, pokeballs, greatballs, ultraballs, masterballs, 
+                 base_catch_rate, ball_data, SHembed_editor, earnings, flee_chance):
+        super().__init__(timeout=60)  # 60 second timeout
+        self.ctx = ctx
+        self.name = name
+        self.pokeballs = pokeballs
+        self.greatballs = greatballs
+        self.ultraballs = ultraballs
+        self.masterballs = masterballs
+        self.base_catch_rate = base_catch_rate
+        self.ball_data = ball_data
+        self.SHembed_editor = SHembed_editor
+        self.earnings = earnings
+        self.flee_chance = flee_chance
+        self.code = 0
+        self.catch_result = None
+        self.catch = None
+        self.rate = None
+
+        self.emojis = {
+            "pokeball": get_emoji("pokeball"),
+            "greatball": get_emoji("greatball"),
+            "ultraball": get_emoji("ultraball"),
+            "masterball": get_emoji("masterball")
+        }
         
-        # Fetch user data from MongoDB
-        user_data = inventory_collection.find_one({"_id": str(ctx.author.id)})
-        
-        if not user_data:
-            error_embed = discord.Embed(
-                title="No User Data",
-                description="You have not begun your adventure! Start by using the `%start` command.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=error_embed)
-            return code, catch_result, catch, rate, earnings
-        
-        pokedollars = user_data.get("Pokedollars", 0)
-        pokeballs = user_data.get("Pokeballs", 0)
-        greatballs = user_data.get("Greatballs", 0)
-        ultraballs = user_data.get("Ultraballs", 0)
-        masterballs = user_data.get("Masterballs", 0)
-        
-        if pokeballs <= 0 and greatballs <= 0 and ultraballs <= 0 and masterballs <= 0:
-            error_embed = discord.Embed(
-                title="No Pokéballs",
-                description=f"You don't have any Pokéballs! You could only watch as {name} fled.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=error_embed)
-            await update_embed_title(SHembed_editor, f"{name} fled!")
-            return code, catch_result, catch, rate, earnings
-        
-        # Load ball data from MongoDB
-        ball_data = config_collection.find_one({"_id": "pokeballs"})
-        
-        pokemon_data = search_pokemon_by_name(name)
-        if pokemon_data is None:
-            error_embed = discord.Embed(
-                title="Pokémon Not Found",
-                description=f"Could not find a Pokémon named '{name}'. Please check the spelling.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=error_embed)
-            await update_embed_title(SHembed_editor, f"{name} fled!")
-            return 0, None, None, None, None
-        
-        base_catch_rate = pokemon_data["catch_rate"]
-        earnings = random.randint(50, 150)
-        flee_chance = 40
-        
-        while True:
-            def check(msg):
-                return (
-                    msg.author == ctx.author and
-                    msg.channel == ctx.channel and
-                    msg.content and
-                    not msg.content.startswith("%")
-                )
-            
-            try:
-                msg = await client.wait_for("message", check=check, timeout=60.0)
-            except asyncio.TimeoutError:
-                error_embed = discord.Embed(
-                    title="Timeout",
-                    description=f"You took too long to throw a ball! {name} fled!",
-                    color=discord.Color.red()
-                )
-                await ctx.send(embed=error_embed)
-                await update_embed_title(SHembed_editor, f"{name} fled!")
-                return code, catch_result, catch, rate, earnings
-            
-            # Process pokeball selection
-            if msg.content.lower() in ["pokeball", "pb"]:
-                if pokeballs <= 0:
-                    error_embed = discord.Embed(
-                        title="Not Enough Pokéballs",
-                        description="You don't have enough Pokéballs!",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=error_embed)
-                    continue
-                pokeballs -= 1
-                ball_multiplier = ball_data["Pokeball"]
-            elif msg.content.lower() in ["greatball", "gb"]:
-                if greatballs <= 0:
-                    error_embed = discord.Embed(
-                        title="Not Enough Greatballs",
-                        description="You don't have enough Greatballs!",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=error_embed)
-                    continue
-                greatballs -= 1
-                ball_multiplier = ball_data["Greatball"]
-            elif msg.content.lower() in ["ultraball", "ub"]:
-                if ultraballs <= 0:
-                    error_embed = discord.Embed(
-                        title="Not Enough Ultraballs",
-                        description="You don't have enough Ultraballs!",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=error_embed)
-                    continue
-                ultraballs -= 1
-                ball_multiplier = ball_data["Ultraball"]
-            elif msg.content.lower() in ["masterball", "mb"]:
-                if masterballs <= 0:
-                    error_embed = discord.Embed(
-                        title="Not Enough Masterballs",
-                        description="You don't have enough Masterballs!",
-                        color=discord.Color.red()
-                    )
-                    await ctx.send(embed=error_embed)
-                    continue
-                masterballs -= 1
-                ball_multiplier = ball_data["Masterball"]
-            elif msg.content.lower() in ["run"]:
-                await update_embed_title(SHembed_editor, f"Got away from {name} safely.")
-                code = 1
-                catch_result = "ran"
-                return code, catch_result, catch, rate, earnings
-            else:
-                error_embed = discord.Embed(
-                    title="Invalid Input",
-                    description="Enter a pokeball name to use it (pokeball, greatball, ultraball, masterball or run to flee).",
-                    color=discord.Color.red()
-                )
-                await ctx.send(embed=error_embed)
-                continue
-            
-            # Update user's inventory in MongoDB
-            inventory_collection.update_one(
-                {"_id": str(ctx.author.id)},
-                {"$set": {
-                    "Pokeballs": pokeballs,
-                    "Greatballs": greatballs,
-                    "Ultraballs": ultraballs,
-                    "Masterballs": masterballs
-                }}
-            )
-            
-            # Calculate catch chance
-            modified_catch_rate = base_catch_rate * ball_multiplier
-            catch = random.randint(0, 255)
-            
-            # Handle catch outcome
-            if catch <= modified_catch_rate:
-                catch_result = True
-                inventory_collection.update_one(
-                    {"_id": str(ctx.author.id)},
-                    {"$inc": {"Pokedollars": earnings}}
-                )
-                code = 1
-                break
-            elif random.randint(1, 100) <= flee_chance:
-                await update_embed_title(SHembed_editor, f"{name} fled!")
-                catch_result = "ran"
-                code = 1
-                break
-            else:
-                random_retry_msg = random.choice([f"Argh so close! {name} broke free!", f"Not even close! {name} broke free!"])
-                await update_embed_title(SHembed_editor, random_retry_msg)
-        
-        return code, catch_result, catch, modified_catch_rate, earnings
+        # Add buttons dynamically based on inventory
+        self._setup_buttons()
     
-    except Exception as e:
-        error_embed = discord.Embed(
-            title="Error Occurred",
-            description=f"An error occurred during your catch attempt: {str(e)}",
-            color=discord.Color.red()
+    def _setup_buttons(self):
+        """Add ball buttons based on what's in inventory using loop to reduce duplication"""
+        ball_types = [
+            ("pokeball", self.pokeballs, self.pokeball_callback),
+            ("greatball", self.greatballs, self.greatball_callback),
+            ("ultraball", self.ultraballs, self.ultraball_callback),
+            ("masterball", self.masterballs, self.masterball_callback)
+        ]
+        
+        for ball_type, count, callback in ball_types:
+            if count > 0:
+                button = discord.ui.Button(
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=ball_type,
+                    emoji=self.emojis[ball_type]
+                )
+                button.callback = callback
+                self.add_item(button)
+        
+        # Add run button
+        run_button = discord.ui.Button(
+            style=discord.ButtonStyle.danger,
+            label="Run",
+            custom_id="run"
         )
-        await ctx.send(embed=error_embed)
-        return 0, None, None, None, None
+        run_button.callback = self.run_callback
+        self.add_item(run_button)
+
+    async def _update_embed(self, title=None, update_footer=False):
+        """Update multiple parts of the embed in a single edit operation"""
+        embed = self.SHembed_editor.embeds[0]
+        
+        # Update title if provided
+        if title is not None:
+            embed.title = title
+        
+        # Update footer if requested
+        if update_footer:
+            footer_text = self._get_footer_text()
+            embed.set_footer(text=footer_text)
+        
+        # Perform a single edit operation
+        await self.SHembed_editor.edit(embed=embed)
+
+    def _get_footer_text(self):
+        """Generate consistent footer text"""
+        ball_counts = []
+        if self.pokeballs > 0:
+            ball_counts.append(f"Pokeball: {self.pokeballs}")
+        if self.greatballs > 0:
+            ball_counts.append(f"Greatball: {self.greatballs}")
+        if self.ultraballs > 0:
+            ball_counts.append(f"Ultraball: {self.ultraballs}")
+        if self.masterballs > 0:
+            ball_counts.append(f"Masterball: {self.masterballs}")
+        
+        return f"{self.ctx.author.name}'s Battle | " + " | ".join(ball_counts)
+
+    async def pokeball_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon battle!", ephemeral=True)
+            return
+        
+        self.pokeballs -= 1
+        await self._process_catch_attempt(interaction, self.ball_data["Pokeball"], "Pokeball")
     
+    async def greatball_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon battle!", ephemeral=True)
+            return
+        
+        self.greatballs -= 1
+        await self._process_catch_attempt(interaction, self.ball_data["Greatball"], "Greatball")
+    
+    async def ultraball_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon battle!", ephemeral=True)
+            return
+        
+        self.ultraballs -= 1
+        await self._process_catch_attempt(interaction, self.ball_data["Ultraball"], "Ultraball")
+    
+    async def masterball_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon battle!", ephemeral=True)
+            return
+        
+        self.masterballs -= 1
+        await self._process_catch_attempt(interaction, self.ball_data["Masterball"], "Masterball")
+    
+    async def run_callback(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This is not your Pokémon battle!", ephemeral=True)
+            return
+
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+
+        # Update title and view in ONE operation
+        await self._update_embed(title=f"Got away from {self.name} safely.")
+
+        # Ensure the view is updated with disabled buttons
+        await interaction.response.edit_message(embed=self.SHembed_editor.embeds[0], view=self)
+
+        self.code = 1
+        self.catch_result = "ran"
+        self.stop()
+
+    async def _process_catch_attempt(self, interaction, ball_multiplier, ball_name):
+        """Process a catch attempt with the given ball multiplier"""
+        from main import inventory_collection
+        
+        # Update inventory in MongoDB
+        inventory_collection.update_one(
+            {"_id": str(self.ctx.author.id)},
+            {"$set": {
+                "Pokeballs": self.pokeballs,
+                "Greatballs": self.greatballs,
+                "Ultraballs": self.ultraballs,
+                "Masterballs": self.masterballs
+            }}
+        )
+        
+        # Calculate catch chance
+        modified_catch_rate = self.base_catch_rate * ball_multiplier
+        catch = random.randint(0, 255)
+        
+        # Clear the view and recreate the buttons with updated counts
+        self.clear_items()
+        self._setup_buttons()
+        
+        # Handle catch outcome and update embed in a single operation
+        if catch <= modified_catch_rate:
+            # Successful catch
+            self.catch_result = True
+            inventory_collection.update_one(
+                {"_id": str(self.ctx.author.id)},
+                {"$inc": {"Pokedollars": self.earnings}}
+            )
+            
+            # Update both title and footer in one operation
+            await self._update_embed(
+                title=f"{self.name} was caught! You earned {self.earnings} Pokedollars",
+                update_footer=True
+            )
+            
+            # Disable all buttons after successful catch
+            for item in self.children:
+                item.disabled = True
+                
+            self.code = 1
+            self.catch = catch
+            self.rate = modified_catch_rate
+            
+            await interaction.response.edit_message(view=self)
+            self.stop()
+            
+        elif random.randint(1, 100) <= self.flee_chance:
+            # Pokémon fled
+            await self._update_embed(
+                title=f"{self.name} fled!",
+                update_footer=True
+            )
+            
+            # Disable all buttons after the Pokémon flees
+            for item in self.children:
+                item.disabled = True
+                
+            self.catch_result = "ran"
+            self.code = 1
+            self.catch = catch
+            self.rate = modified_catch_rate
+            
+            await interaction.response.edit_message(view=self)
+            self.stop()
+            
+        else:
+            # Failed catch, but Pokémon didn't flee
+            random_retry_msg = random.choice([
+                f"Argh so close! {self.name} broke free!", 
+                f"Not even close! {self.name} broke free!"
+            ])
+            
+            await self._update_embed(
+                title=random_retry_msg,
+                update_footer=True
+            )
+            
+            self.catch = catch
+            self.rate = modified_catch_rate
+            
+            await interaction.response.edit_message(view=self)
+    
+    async def on_timeout(self):
+        """Handle timeout (user didn't interact within the timeout period)"""
+        for item in self.children:
+            item.disabled = True
+
+        try:
+            embed = self.SHembed_editor.embeds[0]
+            embed.title = f"{self.name} fled!"
+            await self.SHembed_editor.edit(embed=embed, view=self)
+        except Exception as e:
+            print(f"Error in timeout handler: {e}")
+
+        self.catch_result = "timeout"
+        self.stop()
+        
+async def search_cmd_handler(client, ctx, active_catchers, view):
+    """Simplified handler with only necessary parameters"""
+    try:
+        await view.wait()
+        return view.code, view.catch_result, view.catch, view.rate, view.earnings
+    except Exception as e:
+        print(f"Error in search command handler: {str(e)}")
+        return 0, None, None, None, None
     finally:
         active_catchers.discard(ctx.author.id)

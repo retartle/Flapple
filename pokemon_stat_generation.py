@@ -24,7 +24,32 @@ def generate_unique_id():
     )
     return str(result["last_id"]).zfill(6)
 
-def store_caught_pokemon(pokemon_data, user_id, shiny, level):
+def generate_nature(partner_nature=None, has_synchronize=False):
+    """
+    Generate a Pokémon nature based on the following rules:
+    - If partner has Synchronize ability, 50% chance to match partner's nature
+    - Otherwise, randomly select from 25 available natures with equal probability
+    
+    :param partner_nature: The nature of the partner Pokémon (if applicable)
+    :param has_synchronize: Whether the partner Pokémon has the Synchronize ability
+    :return: The generated nature as a string
+    """
+    natures = [
+        "Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Gentle", "Hardy", "Hasty",
+        "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky",
+        "Rash", "Relaxed", "Sassy", "Serious", "Timid"
+    ]
+    
+    # If partner has Synchronize and a valid nature, 50% chance to match
+    if has_synchronize and partner_nature in natures:
+        if random.random() < 0.5:
+            return partner_nature
+    
+    # Otherwise, select a random nature with equal probability
+    return random.choice(natures)
+
+
+def store_caught_pokemon(pokemon_data, user_id, shiny, level, nature):
     from main import inventory_collection, pokemon_collection
     ivs = {
         "hp": generate_iv(),
@@ -44,6 +69,7 @@ def store_caught_pokemon(pokemon_data, user_id, shiny, level):
         "nickname": None,
         "shiny": shiny,
         "level": level,
+        "nature": nature,  
         "ivs": ivs,
         "base_stats": pokemon_data["stats"],
         "final_stats": {

@@ -170,6 +170,8 @@ async def start(ctx):
                 "special-defense": generate_iv(),
                 "speed": generate_iv()
             }
+
+            nature = generate_nature()
             
             # Create the Pokemon document
             pokemon_doc = {
@@ -179,6 +181,7 @@ async def start(ctx):
                 "nickname": None,
                 "shiny": is_shiny,
                 "level": 5,
+                "nature": nature,
                 "ivs": ivs,
                 "base_stats": full_pokemon_data["stats"],
                 "final_stats": {
@@ -729,87 +732,153 @@ async def search(ctx):
         error_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
         await ctx.send(embed=error_embed)
         return
-
-    # Check if the command is on cooldown
-    bucket = commands.CooldownMapping.from_cooldown(1, 7, commands.BucketType.user)
-    retry_after = bucket.get_bucket(ctx).update_rate_limit()
-    if retry_after:
-        error_embed = discord.Embed(
-            title="Command on Cooldown",
-            description=f"Please retry in {round(retry_after)} seconds.",
-            color=discord.Color.red()
-        )
-        error_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
-        await ctx.send(embed=error_embed)
-        return
-
-    # Add user to active catchers set
+    
+    # Add user to active catchers set within try-finally block to ensure cleanup
     active_catchers.add(ctx.author.id)
-
+    
     try:
+        # Get user inventory data
+        user_data = inventory_collection.find_one({"_id": str(ctx.author.id)})
+        if not user_data:
+            error_embed = discord.Embed(
+                title="No User Data",
+                description="You have not begun your adventure! Start by using the `%start` command.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=error_embed)
+            return
+        
+        # Get ball counts
+        pokeballs = user_data.get("Pokeballs", 0)
+        greatballs = user_data.get("Greatballs", 0)
+        ultraballs = user_data.get("Ultraballs", 0)
+        masterballs = user_data.get("Masterballs", 0)
+        
+        # Check if user has any Pokéballs
+        if pokeballs <= 0 and greatballs <= 0 and ultraballs <= 0 and masterballs <= 0:
+            error_embed = discord.Embed(
+                title="No Pokéballs",
+                description="You don't have any Pokéballs! You need to buy some first.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=error_embed)
+            return
+        
+        # Generate the wild Pokémon - do this all at once
         results, shiny = choose_random_wild(normal_ID_list, mythical_ID_list, legendary_ID_list)
         level = random.randint(3, 20)
-        type = ", ".join([t.capitalize() for t in results["types"]])
-        colour = get_type_colour(type.split(','))
+        type_str = ", ".join([t.capitalize() for t in results["types"]])
+        colour = get_type_colour(type_str.split(','))
         name = results["name"].capitalize().replace('-', ' ')
-
-        if results:
-            sprite_url = await get_best_sprite_url(results, shiny)
-            if shiny:
-                name = f"{name} ⭐"
-
-            # Fetch user data from MongoDB
-            user_data = inventory_collection.find_one({"_id": str(ctx.author.id)})
-            if not user_data:
-                await ctx.send("You have not begun your adventure! Start by using the `%start` command.")
-                active_catchers.discard(ctx.author.id)
-                return
-
-            pb = user_data.get("Pokeballs", 0)
-            gb = user_data.get("Greatballs", 0)
-            ub = user_data.get("Ultraballs", 0)
-            mb = user_data.get("Masterballs", 0)
-
-            SHembed = discord.Embed(title=f"{ctx.author.name} found a Lvl {level} {name} !", colour=colour)
-            SHembed.add_field(name="Select a ball to use", value=f"Number of Pokeballs:{pb}\nNumber of Greatballs:{gb}\nNumber of Ultraballs:{ub}\nNumber of Masterballs:{mb}")
-            SHembed.set_footer(text=f"{ctx.author.name}'s Battle")
-            SHembed.set_image(url=sprite_url)
-            SHembed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
-            SHembed_editor = await ctx.send(embed=SHembed)
-
-            code, catch_result, catch, rate, earnings = await search_cmd_handler(client, ctx, name, SHembed_editor, active_catchers)
-
-            if code == 0:
-                print("Returned with code 0")
-            elif catch_result == "ran":
-                active_catchers.discard(ctx.author.id)
-                return
-            elif catch_result:
-                await update_embed_title(SHembed_editor, f"{name} was caught! You earned {earnings} Pokedollars")
-                unique_id = store_caught_pokemon(results, str(ctx.author.id), shiny, level)
-                pokemon = pokemon_collection.find_one({"_id": unique_id})
-
-                RESULTembed = discord.Embed(title=f"Catch Summary", description=f"Lvl. {pokemon['level']} {name}", colour=colour)
-                RESULTembed.set_thumbnail(url=sprite_url)
-                RESULTembed.add_field(name="Type", value=type, inline=False)
-                for stat, value in pokemon["final_stats"].items():
-                    RESULTembed.add_field(name=f"{stat.capitalize()}", value=f"{value} (IV: {pokemon['ivs'][stat]})", inline=True)
-                RESULTembed.set_footer(text=f"Caught by {ctx.author} | ID: {pokemon['_id']}")
-
-                result_message = await ctx.send(embed=RESULTembed)
-
-                await prompt_for_nickname(ctx, name, unique_id)
-            else:
-                await update_embed_title(SHembed_editor, f"{name} escaped... It rolled a {catch} but you only had {rate}")
-
+        
+        # Check if partner has Synchronize ability and get partner's nature
+        partner_nature = None
+        has_synchronize = False
+        
+        if "partner_pokemon" in user_data and user_data["partner_pokemon"]:
+            partner = pokemon_collection.find_one({"_id": user_data["partner_pokemon"]})
+            if partner:
+                partner_nature = partner.get("nature")
+                # In a real implementation, you would check if the partner has Synchronize
+                # For now, we'll use a placeholder since abilities aren't implemented yet
+                # has_synchronize = "Synchronize" in partner.get("abilities", [])
+                
+                # This is a placeholder. Replace this when you implement abilities
+                partner_pokemon_data = search_pokemon_by_id(partner["pokedex_id"])
+                if partner_pokemon_data and "abilities" in partner_pokemon_data:
+                    has_synchronize = "synchronize" in [a.lower() for a in partner_pokemon_data.get("abilities", [])]
+        
+        # Generate nature for the wild Pokémon
+        nature = generate_nature(partner_nature, has_synchronize)
+        
+        # Get sprite URL
+        sprite_url = await get_best_sprite_url(results, shiny)
+        if shiny:
+            name = f"{name} ⭐"
+        
+        # Prepare all data before creating any embeds or views
+        ball_data = config_collection.find_one({"_id": "pokeballs"})
+        base_catch_rate = results["catch_rate"]
+        earnings = random.randint(50, 150)
+        flee_chance = 20
+        
+        # Format footer ball counts first
+        ball_counts = []
+        if pokeballs > 0:
+            ball_counts.append(f"Pokeball: {pokeballs}")
+        if greatballs > 0:
+            ball_counts.append(f"Greatball: {greatballs}")
+        if ultraballs > 0:
+            ball_counts.append(f"Ultraball: {ultraballs}")
+        if masterballs > 0:
+            ball_counts.append(f"Masterball: {masterballs}")
+        
+        footer_text = f"{ctx.author.name}'s Battle | " + " | ".join(ball_counts)
+        
+        # Create the embed once with all data
+        SHembed = discord.Embed(title=f"{ctx.author.name} found a Lvl {level} {name}!", colour=colour)
+        SHembed.set_image(url=sprite_url)
+        SHembed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar)
+        SHembed.set_footer(text=footer_text)
+        
+        # Create and attach the view after sending
+        view = PokemonEncounterView(
+            ctx=ctx,
+            name=name,
+            pokeballs=pokeballs,
+            greatballs=greatballs,
+            ultraballs=ultraballs,
+            masterballs=masterballs,
+            base_catch_rate=base_catch_rate,
+            ball_data=ball_data,
+            SHembed_editor=None,
+            earnings=earnings,
+            flee_chance=flee_chance
+        )
+        
+        # Update message with view - only one embed update
+        SHembed_editor = await ctx.send(embed=SHembed, view=view)
+        view.SHembed_editor = SHembed_editor    
+        
+        # Wait for the interaction to complete
+        code, catch_result, catch, rate, earnings = await search_cmd_handler(
+            client, ctx, active_catchers, view=view
+        )
+        
+        # Only handle successful catch for additional actions
+        if catch_result is True:
+            unique_id = store_caught_pokemon(results, str(ctx.author.id), shiny, level, nature)
+            pokemon = pokemon_collection.find_one({"_id": unique_id})
+            
+            # Create the catch summary embed
+            RESULTembed = discord.Embed(title=f"Catch Summary", description=f"Lvl. {pokemon['level']} {name}", colour=colour)
+            RESULTembed.set_thumbnail(url=sprite_url)
+            RESULTembed.add_field(name="Type", value=type_str, inline=False)
+            
+            # Add nature to the catch summary
+            RESULTembed.add_field(name="Nature", value=nature, inline=True)
+            
+            # Display stats
+            for stat, value in pokemon["final_stats"].items():
+                RESULTembed.add_field(name=f"{stat.capitalize()}", value=f"{value} (IV: {pokemon['ivs'][stat]})", inline=True)
+            
+            RESULTembed.set_footer(text=f"Caught by {ctx.author} | ID: {pokemon['_id']}")
+            
+            await ctx.send(embed=RESULTembed)
+            
+            # Prompt for nickname
+            await prompt_for_nickname(ctx, name, unique_id)
+        
     except Exception as e:
-        active_catchers.discard(ctx.author.id)
         error_embed = discord.Embed(
             title="Error Occurred",
             description=f"An error occurred during your search: {str(e)}",
             color=discord.Color.red()
         )
         await ctx.send(embed=error_embed)
+    finally:
+        # Always remove user from active catchers
+        active_catchers.discard(ctx.author.id)
         
 @client.command()
 async def box(ctx, page: int = 1, user: discord.Member = None):

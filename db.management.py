@@ -14,13 +14,11 @@ def connect_to_mongodb():
         mongo_uri = os.getenv('Mongo_API')
         if not mongo_uri:
             raise ValueError("Mongo_API environment variable is not set or empty")
-        
         print(f"Connecting to MongoDB...")
         
         # Check if using SRV connection string
         if 'mongodb+srv://' in mongo_uri:
             print("Using SRV connection format")
-            
             # SRV connection strings don't use port numbers
             if ':27017' in mongo_uri:
                 print("Warning: SRV connection strings should not include port numbers.")
@@ -31,6 +29,7 @@ def connect_to_mongodb():
         client.admin.command('ping')
         print("Successfully connected to MongoDB")
         return client.flapple
+    
     except Exception as e:
         print(f"Error connecting to MongoDB: {str(e)}")
         print("\nTips to fix connection issues:")
@@ -39,6 +38,31 @@ def connect_to_mongodb():
         print("3. Verify your IP address is allowlisted in MongoDB Atlas")
         print("4. If using mongodb+srv://, verify your cluster hostname is correct")
         sys.exit(1)
+
+def initialize_emoji_collection():
+    """Upload custom emoji data to MongoDB"""
+    db = connect_to_mongodb()
+    
+    try:
+        # Define emoji data - just ID and emoji (Discord emoji ID format)
+        emoji_data = [
+            {"_id": "pokeball", "emoji": "<:pokeball:1355407403046146161>"},
+            {"_id": "greatball", "emoji": "<:greatball:1355407398961021150>"},
+            {"_id": "ultraball", "emoji": "<:ultraball:1355407404975656970>"},
+            {"_id": "masterball", "emoji": "<:masterball:1355407400978354186>"}
+        ]
+        
+        # Clear existing emoji data first
+        db.emojis.delete_many({})
+        
+        # Insert new emoji data
+        result = db.emojis.insert_many(emoji_data)
+        print(f"✅ Uploaded {len(result.inserted_ids)} emoji mappings to MongoDB")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Error uploading emoji data: {str(e)}")
+        return False
 
 def upload_initial_data():
     """Upload all initial data to MongoDB"""
@@ -59,7 +83,7 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading Pokémon data: {str(e)}")
-
+    
     try:
         # Upload Move data
         with open('./fresh_data/all_move_data.json', 'r') as f:
@@ -72,7 +96,7 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading move data: {str(e)}")
-
+    
     try:
         # Upload Pokeball data
         with open('./fresh_data/config.json', 'r') as f:
@@ -85,7 +109,7 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading pokeball data: {str(e)}")
-
+    
     try:
         # Upload last unique ID
         with open('./fresh_data/last_unique_id.txt', 'r') as f:
@@ -98,7 +122,7 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading last unique ID: {str(e)}")
-
+    
     try:
         # Upload inventory data
         with open('./fresh_data/Inventory.json', 'r') as f:
@@ -113,7 +137,6 @@ def upload_initial_data():
         
         # Clear existing data first
         db.inventory.delete_many({})
-        
         if user_docs:
             result = db.inventory.insert_many(user_docs)
             print(f"✅ Uploaded {len(result.inserted_ids)} user inventories to MongoDB")
@@ -122,7 +145,7 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading inventory data: {str(e)}")
-
+    
     try:
         # Upload caught Pokémon data
         with open('./fresh_data/caught_pokemon_data.json', 'r') as f:
@@ -137,7 +160,6 @@ def upload_initial_data():
         
         # Clear existing data first
         db.caught_pokemon.delete_many({})
-        
         if caught_pokemon_docs:
             result = db.caught_pokemon.insert_many(caught_pokemon_docs)
             print(f"✅ Uploaded {len(result.inserted_ids)} caught Pokémon to MongoDB")
@@ -146,15 +168,24 @@ def upload_initial_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error uploading caught Pokémon data: {str(e)}")
-
-    if successes == 6:
+    
+    try:
+        # Initialize emoji collection
+        initialize_emoji_collection()
+        print(f"✅ Uploaded emoji data to MongoDB")
+        successes += 1
+    except Exception as e:
+        print(f"❌ Error in emoji collection initialization: {str(e)}")
+    
+    if successes == 7:  # Updated from 6 to 7 since we added emoji operation
         print("\n🎉 Initial data upload complete successfully!")
     else:
-        print(f"\n⚠️ Initial data upload partially completed ({successes}/6 operations successful)")
+        print(f"\n⚠️ Initial data upload partially completed ({successes}/7 operations successful)")
 
 def backup_data():
     """Backup all MongoDB data to local JSON files"""
     db = connect_to_mongodb()
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_dir = f"./backups/backup_{timestamp}"
     
@@ -179,7 +210,7 @@ def backup_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error backing up Pokémon data: {str(e)}")
-
+    
     try:
         # Backup Move data
         move_data = list(db.moves.find({}, {'_id': 0}))
@@ -190,7 +221,7 @@ def backup_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error backing up move data: {str(e)}")
-
+    
     try:
         # Backup Inventory data - Fixed format to match original JSON structure
         inventory_data = list(db.inventory.find({}))
@@ -206,7 +237,7 @@ def backup_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error backing up inventory data: {str(e)}")
-
+    
     try:
         # Backup Caught Pokemon data - Fixed format to match original JSON structure
         caught_pokemon_data = list(db.caught_pokemon.find({}))
@@ -222,7 +253,7 @@ def backup_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error backing up caught Pokémon data: {str(e)}")
-
+    
     try:
         # Backup last unique ID
         last_id_doc = db.unique_id.find_one({"_id": "last_id"})
@@ -236,7 +267,7 @@ def backup_data():
             print("⚠️ No last unique ID found in database")
     except Exception as e:
         print(f"❌ Error backing up last unique ID: {str(e)}")
-
+    
     try:
         # Backup config data
         config_data = list(db.config.find({}))
@@ -247,11 +278,29 @@ def backup_data():
         successes += 1
     except Exception as e:
         print(f"❌ Error backing up config data: {str(e)}")
-
-    if successes == 6:
+    
+    try:
+        # Backup emoji data
+        emoji_data = list(db.emojis.find({}))
+        emoji_output = {}
+        
+        for emoji in emoji_data:
+            emoji_id = emoji.pop("_id")
+            emoji_output[emoji_id] = emoji
+            
+        backup_file = f"{backup_dir}/backup_emoji_data.json"
+        with open(backup_file, 'w') as f:
+            json.dump(emoji_output, f, indent=2)
+        
+        print(f"✅ Backed up {len(emoji_data)} emoji mappings to {backup_file}")
+        successes += 1
+    except Exception as e:
+        print(f"❌ Error backing up emoji data: {str(e)}")
+    
+    if successes == 7:  # Updated from 6 to 7 since we added emoji backup
         print(f"\n🎉 Backup completed successfully to directory: {backup_dir}")
     else:
-        print(f"\n⚠️ Backup partially completed ({successes}/6 operations successful) to directory: {backup_dir}")
+        print(f"\n⚠️ Backup partially completed ({successes}/7 operations successful) to directory: {backup_dir}")
 
 def main():
     """Run the backup task"""

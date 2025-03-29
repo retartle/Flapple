@@ -234,6 +234,10 @@ async def preview_and_select_starter(ctx, client, chosen_generation, starter_pok
         return None
 
 async def create_starter_summary_embed(ctx, starter, full_data, unique_id, is_shiny):
+    # Fetch the actual Pokemon data including the nature
+    from main import pokemon_collection
+    pokemon = pokemon_collection.find_one({"_id": unique_id})
+    
     # Create an actual Embed object instead of a dictionary
     embed = discord.Embed(
         title="Professor Oak",
@@ -245,6 +249,9 @@ async def create_starter_summary_embed(ctx, starter, full_data, unique_id, is_sh
     embed.add_field(name="Your New Partner", value=f"**{starter['name']}**" + (" ⭐" if is_shiny else ""), inline=False)
     embed.add_field(name="Type", value=", ".join([t.capitalize() for t in full_data.get("types", [])]), inline=True)
     embed.add_field(name="Ability", value=full_data.get("abilities", ["Unknown"])[0].capitalize(), inline=True)
+    
+    # Add nature field
+    embed.add_field(name="Nature", value=pokemon.get("nature", "Unknown"), inline=True)
     
     # Add stats
     base_stats = full_data.get("stats", {})
