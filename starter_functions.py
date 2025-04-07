@@ -237,6 +237,7 @@ async def create_starter_summary_embed(ctx, starter, full_data, unique_id, is_sh
     # Fetch the actual Pokemon data including the nature
     from main import pokemon_collection
     pokemon = pokemon_collection.find_one({"_id": unique_id})
+    ability_name = pokemon.get("ability", "Unknown")
     
     # Create an actual Embed object instead of a dictionary
     embed = discord.Embed(
@@ -248,7 +249,7 @@ async def create_starter_summary_embed(ctx, starter, full_data, unique_id, is_sh
     # Add the fields to the embed directly
     embed.add_field(name="Your New Partner", value=f"**{starter['name']}**" + (" ⭐" if is_shiny else ""), inline=False)
     embed.add_field(name="Type", value=", ".join([t.capitalize() for t in full_data.get("types", [])]), inline=True)
-    embed.add_field(name="Ability", value=full_data.get("abilities", ["Unknown"])[0].capitalize(), inline=True)
+    embed.add_field(name="Ability", value=ability_name.capitalize() if ability_name else "Unknown", inline=True)
     
     # Add nature field
     embed.add_field(name="Nature", value=pokemon.get("nature", "Unknown"), inline=True)

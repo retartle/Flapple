@@ -73,7 +73,7 @@ def upload_initial_data():
     
     try:
         # Upload Pokemon data
-        with open('./fresh_data/all_pokemon_data_v2.json', 'r') as f:
+        with open('./fresh_data/all_pokemon_data_v3.json', 'r') as f:
             pokemon_data = json.load(f)
         
         # Clear existing data first

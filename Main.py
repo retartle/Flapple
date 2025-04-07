@@ -172,6 +172,8 @@ async def start(ctx):
             }
 
             nature = generate_nature()
+            starter_ability_name = generate_ability(full_pokemon_data)
+            starter_initial_xp = calculate_min_xp_for_level(5)
             
             # Create the Pokemon document
             pokemon_doc = {
@@ -192,7 +194,8 @@ async def start(ctx):
                     "special-defense": calculate_stat(full_pokemon_data["stats"]["special-defense"], ivs["special-defense"], 5),
                     "speed": calculate_stat(full_pokemon_data["stats"]["speed"], ivs["speed"], 5)
                 },
-                "xp": 0  # Initialize XP to 0
+                "xp": starter_initial_xp,
+                "ability": starter_ability_name
             }
             
             # Insert the Pokemon
@@ -786,7 +789,7 @@ async def search(ctx):
                 # This is a placeholder. Replace this when you implement abilities
                 partner_pokemon_data = search_pokemon_by_id(partner["pokedex_id"])
                 if partner_pokemon_data and "abilities" in partner_pokemon_data:
-                    has_synchronize = "synchronize" in [a.lower() for a in partner_pokemon_data.get("abilities", [])]
+                    has_synchronize = "synchronize" in [a.get("name", "").lower() for a in partner_pokemon_data.get("abilities", [])]
         
         # Generate nature for the wild Pokémon
         nature = generate_nature(partner_nature, has_synchronize)
@@ -849,11 +852,13 @@ async def search(ctx):
         if catch_result is True:
             unique_id = store_caught_pokemon(results, str(ctx.author.id), shiny, level, nature)
             pokemon = pokemon_collection.find_one({"_id": unique_id})
+            ability_name = pokemon.get("ability", "Unknown")
             
             # Create the catch summary embed
             RESULTembed = discord.Embed(title=f"Catch Summary", description=f"Lvl. {pokemon['level']} {name}", colour=colour)
             RESULTembed.set_thumbnail(url=sprite_url)
             RESULTembed.add_field(name="Type", value=type_str, inline=False)
+            RESULTembed.add_field(name="Ability", value=ability_name.capitalize() if ability_name else "Unknown", inline=True)
             
             # Add nature to the catch summary
             RESULTembed.add_field(name="Nature", value=nature, inline=True)
