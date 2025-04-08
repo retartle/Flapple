@@ -1,20 +1,35 @@
 import json
 import random
 from random import randint
+import io
 import asyncio
 import aiohttp
 import discord
 import os
 from pymongo import MongoClient
+from PIL import Image
+import cv2
 
 # Simple cache to store URL validity checks
 sprite_cache = {}
 
+session = None
+
+def get_session():
+    global session
+    return session
+
+async def initialize_session():
+    global session
+    if session is None:
+        session = aiohttp.ClientSession()
+    return session
+
 async def update_embed_title(message, new_title):
-    # This function doesn't interact with the database, so it remains unchanged
     embed = message.embeds[0]
     embed.title = new_title
-    await message.edit(embed=embed)
+    # Clear attachments to prevent duplicates
+    await message.edit(embed=embed, attachments=[])
 
 def initialize_wild_pool():
     # MongoDB version
@@ -68,56 +83,236 @@ def get_next_evolution(evolution_line, current_pokemon):
         return "-"
     
 async def check_url(url):
-    # Return the cached result if available
+    global session
+    if session is None:
+        session = await initialize_session()
+    
     if url in sprite_cache:
         return sprite_cache[url]
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.head(url) as response:
-                is_valid = response.status == 200
-                sprite_cache[url] = is_valid
-                return is_valid
-        except Exception:
-            sprite_cache[url] = False
-            return False
+    
+    try:
+        async with session.head(url, timeout=2) as response:
+            is_valid = response.status == 200
+            sprite_cache[url] = is_valid
+            return is_valid
+    except Exception:
+        sprite_cache[url] = False
+        return False
 
-async def get_best_sprite_url(pokemon_data, shiny=False):
-    """
-    Get the best available sprite URL from the pokemon data by checking 
-    each candidate URL for validity (status 200).
-    """
+async def get_best_sprite_url(pokemon_data, shiny=False, environment_mode="off"):
+    """Get the best sprite URL based on environment rendering preference"""
     if not pokemon_data or "sprites" not in pokemon_data:
         return None
-
+    
     sprites = pokemon_data["sprites"]
-
-    # Define sprite priority order based on shiny or not
-    if shiny:
-        sprite_priority = [
-            "front_shiny",
-            "front_shiny_pokemondb",
-            "front_shiny_pokeapi",
-            "front_default_pokemondb",
-            "front_default_pokeapi"
-        ]
+    
+    # For static environment mode, prioritize static PNG sprites
+    if environment_mode == "static":
+        if shiny:
+            sprite_priority = [
+                "front_shiny_pokemondb",      # Static shiny from PokemonDB
+                "front_shiny_pokeapi",        # Static shiny from PokeAPI
+                "front_shiny",                # Any shiny (possibly animated)
+                "front_default_pokemondb",    # Fallback to non-shiny static
+            ]
+        else:
+            sprite_priority = [
+                "front_default_pokemondb",    # Static from PokemonDB
+                "front_default_pokeapi",      # Static from PokeAPI
+                "front_default",              # Any default (possibly animated)
+            ]
+    # For animated or disabled environment, use standard priority
     else:
-        sprite_priority = [
-            "front_default",
-            "front_default_pokemondb",
-            "front_default_pokemondb_3d",
-            "front_default_pokeapi",
-            "official_artwork",
-            "home_artwork"
-        ]
-
+        if shiny:
+            sprite_priority = [
+                "front_shiny",
+                "front_shiny_pokemondb",
+                "front_shiny_pokeapi",
+                "front_default_pokemondb",
+                "front_default_pokeapi"
+            ]
+        else:
+            sprite_priority = [
+                "front_default",
+                "front_default_pokemondb",
+                "front_default_pokemondb_3d",
+                "front_default_pokeapi",
+                "official_artwork",
+                "home_artwork"
+            ]
+        
     # Check each sprite URL in priority order
     for key in sprite_priority:
         url = sprites.get(key)
         if url:
             if await check_url(url):
                 return url
-
+                
     return None
+
+async def generate_encounter_image(
+    sprite_url: str,
+    background_folder: str = "assets/backgrounds",
+    static_sprite_scale: float = 2.0,  # Scale for static images
+    animated_sprite_scale: float = 3.0,  # Scale for animated GIFs
+    position: str = "bottom_center",
+    bg_size: tuple = (640, 360),
+    is_animated_allowed: bool = False
+) -> tuple[io.BytesIO, bool]:
+    try:
+        # Get background
+        background_files = [f for f in os.listdir(background_folder)
+                          if os.path.isfile(os.path.join(background_folder, f))]
+        chosen_background_path = os.path.join(background_folder, random.choice(background_files))
+        
+        # Fetch sprite data
+        async with aiohttp.ClientSession() as session:
+            async with session.get(sprite_url) as response:
+                if response.status != 200:
+                    return None, False
+                sprite_data = await response.read()
+        
+        # Check if sprite is GIF and if animated processing is allowed
+        sprite_image = Image.open(io.BytesIO(sprite_data))
+        is_animated = sprite_image.format == "GIF" and getattr(sprite_image, "is_animated", False)
+        
+        # For animated GIFs, use Pillow
+        if is_animated and is_animated_allowed:
+            # Use higher scale factor for animated
+            sprite_scale = animated_sprite_scale
+            
+            # Process with Pillow (existing animated GIF code)
+            background = Image.open(chosen_background_path).convert("RGBA")
+            background = background.resize(bg_size, Image.LANCZOS)
+            bg_width, bg_height = background.size
+            
+            frame_count = sprite_image.n_frames
+            frames = []
+            durations = []
+            
+            # Process each frame
+            for frame_idx in range(frame_count):
+                sprite_image.seek(frame_idx)
+                frame_duration = sprite_image.info.get('duration', 100)
+                durations.append(frame_duration)
+                
+                frame = sprite_image.convert("RGBA")
+                original_size = frame.size
+                new_size = (int(original_size[0] * sprite_scale), int(original_size[1] * sprite_scale))
+                frame = frame.resize(new_size, Image.LANCZOS)
+                
+                # Calculate position
+                spr_width, spr_height = frame.size
+                if position == "center":
+                    paste_x = (bg_width - spr_width) // 2
+                    paste_y = (bg_height - spr_height) // 2
+                elif position == "bottom_center":
+                    paste_x = (bg_width - spr_width) // 2
+                    paste_y = bg_height - spr_height - (bg_height // 10)
+                else:
+                    # Default to bottom center
+                    paste_x = (bg_width - spr_width) // 2
+                    paste_y = bg_height - spr_height - (bg_height // 10)
+                
+                new_frame = background.copy()
+                new_frame.paste(frame, (paste_x, paste_y), frame)
+                frames.append(new_frame)
+            
+            # Save as animated GIF
+            final_buffer = io.BytesIO()
+            frames[0].save(
+                final_buffer,
+                format="GIF",
+                save_all=True,
+                append_images=frames[1:],
+                optimize=True,
+                duration=durations,
+                loop=0,
+                disposal=2
+            )
+            final_buffer.seek(0)
+            return final_buffer, True
+            
+        else:
+            # Use OpenCV for static images with smaller scale factor
+            import cv2
+            import numpy as np
+            
+            sprite_scale = static_sprite_scale
+            
+            # Convert sprite to numpy array for OpenCV
+            if is_animated:
+                # Using first frame of GIF
+                sprite_image.seek(0)
+                sprite_pil = sprite_image.convert("RGBA")
+                sprite_array = np.array(sprite_pil)
+                # Convert RGBA to BGRA (OpenCV uses BGR ordering)
+                sprite_array = cv2.cvtColor(sprite_array, cv2.COLOR_RGBA2BGRA)
+            else:
+                # For static images, decode directly with OpenCV
+                sprite_bytes = np.frombuffer(sprite_data, np.uint8)
+                sprite_array = cv2.imdecode(sprite_bytes, cv2.IMREAD_UNCHANGED)
+                # Add alpha channel if missing
+                if sprite_array.shape[2] == 3:
+                    sprite_array = cv2.cvtColor(sprite_array, cv2.COLOR_BGR2BGRA)
+            
+            # Read background with OpenCV (much faster than PIL)
+            bg = cv2.imread(chosen_background_path)
+            bg = cv2.resize(bg, bg_size)
+            bg_height, bg_width = bg.shape[:2]
+            
+            # Resize sprite
+            h, w = sprite_array.shape[:2]
+            sprite_array = cv2.resize(sprite_array, (int(w * sprite_scale), int(h * sprite_scale)))
+            
+            # Calculate position
+            spr_height, spr_width = sprite_array.shape[:2]
+            if position == "center":
+                paste_x = (bg_width - spr_width) // 2
+                paste_y = (bg_height - spr_height) // 2
+            elif position == "bottom_center":
+                paste_x = (bg_width - spr_width) // 2
+                paste_y = bg_height - spr_height - (bg_height // 10)
+            else:
+                paste_x = (bg_width - spr_width) // 2
+                paste_y = bg_height - spr_height - (bg_height // 10)
+            
+            # Convert background to BGRA if needed
+            if bg.shape[2] == 3:
+                bg = cv2.cvtColor(bg, cv2.COLOR_BGR2BGRA)
+            
+            # Create ROI and handle edge cases
+            roi_y_start = max(0, paste_y)
+            roi_y_end = min(bg_height, paste_y + spr_height)
+            roi_x_start = max(0, paste_x)
+            roi_x_end = min(bg_width, paste_x + spr_width)
+            
+            # Adjust sprite selection if paste position is negative
+            sprite_y_start = abs(min(0, paste_y))
+            sprite_x_start = abs(min(0, paste_x))
+            sprite_y_end = sprite_y_start + (roi_y_end - roi_y_start)
+            sprite_x_end = sprite_x_start + (roi_x_end - roi_x_start)
+            
+            # Alpha blending (much faster than PIL paste)
+            roi = bg[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
+            sprite_part = sprite_array[sprite_y_start:sprite_y_end, sprite_x_start:sprite_x_end]
+            
+            # Apply alpha blending
+            alpha = sprite_part[:, :, 3] / 255.0
+            for c in range(0, 3):
+                roi[:, :, c] = sprite_part[:, :, c] * alpha + roi[:, :, c] * (1 - alpha)
+            
+            # Encode to PNG
+            final_buffer = io.BytesIO()
+            _, encoded_img = cv2.imencode('.png', bg, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+            final_buffer.write(encoded_img)
+            final_buffer.seek(0)
+            
+            return final_buffer, False
+            
+    except Exception as e:
+        print(f"Error generating encounter image: {e}")
+        return None, False
 
 def get_emoji(ball_type):
     """Retrieve an emoji for a given ball type"""
@@ -321,6 +516,8 @@ class PokemonEncounterView(discord.ui.View):
         self.catch_result = None
         self.catch = None
         self.rate = None
+        self.is_using_attachment = False
+        self.original_sprite_url = None 
 
         self.emojis = {
             "pokeball": get_emoji("pokeball"),
@@ -361,20 +558,14 @@ class PokemonEncounterView(discord.ui.View):
         self.add_item(run_button)
 
     async def _update_embed(self, title=None, update_footer=False):
-        """Update multiple parts of the embed in a single edit operation"""
         embed = self.SHembed_editor.embeds[0]
-        
-        # Update title if provided
         if title is not None:
             embed.title = title
-        
-        # Update footer if requested
         if update_footer:
             footer_text = self._get_footer_text()
             embed.set_footer(text=footer_text)
-        
-        # Perform a single edit operation
-        await self.SHembed_editor.edit(embed=embed)
+        # Clear attachments to avoid duplicates
+        await self.SHembed_editor.edit(embed=embed, attachments=[])
 
     def _get_footer_text(self):
         """Generate consistent footer text"""

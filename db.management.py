@@ -49,7 +49,8 @@ def initialize_emoji_collection():
             {"_id": "pokeball", "emoji": "<:pokeball:1355407403046146161>"},
             {"_id": "greatball", "emoji": "<:greatball:1355407398961021150>"},
             {"_id": "ultraball", "emoji": "<:ultraball:1355407404975656970>"},
-            {"_id": "masterball", "emoji": "<:masterball:1355407400978354186>"}
+            {"_id": "masterball", "emoji": "<:masterball:1355407400978354186>"},
+            {"_id": "grass", "emoji": "<:grass:1359194334326423835>"},
         ]
         
         # Clear existing emoji data first
