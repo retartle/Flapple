@@ -1066,98 +1066,101 @@ async def search(ctx):
 
     active_catchers.add(ctx.author.id)
     # Immediately respond with a temporary message
-    temp_message = await ctx.send(f"Searching for a wild pokemon... {get_emoji("grass")}")
+    temp_message = await ctx.send(f"Searching for a wild pokemon... {get_emoji('grass')}")
 
     # Offload the heavy processing to a background task
     asyncio.create_task(process_search(ctx, temp_message))
         
+# At the top of your file
+box_cache = {}
+BOX_CACHE_TIMEOUT = 60  # Cache timeout in seconds
+
 @client.command()
 async def box(ctx, page: int = 1, user: discord.Member = None):
     if user is None:
         user = ctx.author
+    
     user_id = str(user.id)
     
-    user_data = inventory_collection.find_one({"_id": user_id})
+    # Check cache first
+    cache_key = f"{user_id}_data"
+    current_time = time.time()
+    
+    if cache_key in box_cache and current_time - box_cache[cache_key]["timestamp"] < BOX_CACHE_TIMEOUT:
+        user_data = box_cache[cache_key]["data"]
+    else:
+        user_data = inventory_collection.find_one({"_id": user_id})
+        if user_data:
+            box_cache[cache_key] = {
+                "data": user_data,
+                "timestamp": current_time
+            }
+    
     if not user_data:
         await ctx.send("You have not begun your adventure! Start by using the `%start` command.")
         return
     
     caught_id_list = user_data.get("caught_pokemon", [])
+    
     if not caught_id_list:
         await ctx.send("You have not caught any Pokémon! Try using the `%search` command.")
         return
-
+    
     total_pokemon = len(caught_id_list)
     pokemon_per_page = 12
     total_pages = max(1, (total_pokemon + pokemon_per_page - 1) // pokemon_per_page)
     current_page = max(1, min(page, total_pages))
-
+    
     color_seed = int(user.id) % 0xFFFFFF
     box_color = discord.Colour(color_seed)
-
-    def get_page_embed(page_num):
+    
+    # Cache for Pokémon data by page
+    async def get_page_embed(page_num):
+        # Check if page data is cached
+        page_cache_key = f"{user_id}_page_{page_num}"
+        if page_cache_key in box_cache and current_time - box_cache[page_cache_key]["timestamp"] < BOX_CACHE_TIMEOUT:
+            return box_cache[page_cache_key]["embed"]
+        
         start_idx = (page_num - 1) * pokemon_per_page
         end_idx = min(start_idx + pokemon_per_page, total_pokemon)
-        current_page_pokemon = caught_id_list[start_idx:end_idx]
-
+        current_page_pokemon_ids = caught_id_list[start_idx:end_idx]
+        
+        # Bulk fetch all Pokémon for this page
+        pokemon_list = list(pokemon_collection.find({"_id": {"$in": current_page_pokemon_ids}}))
+        pokemon_dict = {pokemon["_id"]: pokemon for pokemon in pokemon_list}
+        
         embed = discord.Embed(
             title=f"🎒 {user.name}'s Pokémon Box",
             description=f"Page {page_num}/{total_pages}",
             color=box_color
         )
-
-        for i, pokemon_id in enumerate(current_page_pokemon):
-            pokemon = pokemon_collection.find_one({"_id": pokemon_id})
-            if pokemon:
+        
+        for i, pokemon_id in enumerate(current_page_pokemon_ids):
+            if pokemon_id in pokemon_dict:
+                pokemon = pokemon_dict[pokemon_id]
                 name = pokemon["name"].capitalize().replace('-', ' ')
                 nickname = pokemon.get("nickname")
                 shiny = pokemon["shiny"]
                 level = pokemon["level"]
                 global_number = start_idx + i + 1
-
                 display_name = f"{nickname} ({name})" if nickname else name
                 if shiny:
                     display_name = f"⭐ {display_name}"
-
                 total_iv = sum(pokemon["ivs"].values()) if "ivs" in pokemon else 0
                 iv_percentage = round((total_iv / 186) * 100, 2)
-
                 field_name = f"`#{global_number:03d}` {display_name}"
                 value = f"Lv. {level} | IV: {iv_percentage}%"
                 embed.add_field(name=field_name, value=value, inline=True)
-
+        
         embed.set_footer(text="Use reactions to navigate | %view [number] for details")
+        
+        # Cache the embed
+        box_cache[page_cache_key] = {
+            "embed": embed,
+            "timestamp": current_time
+        }
+        
         return embed
-
-    message = await ctx.send(embed=get_page_embed(current_page))
-
-    if total_pages > 1:
-        reactions = ['⏪', '⬅️', '➡️', '⏩']
-        for reaction in reactions:
-            await message.add_reaction(reaction)
-
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in reactions and reaction.message.id == message.id
-
-        while True:
-            try:
-                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
-                await message.remove_reaction(reaction, user)
-
-                if str(reaction.emoji) == '⬅️' and current_page > 1:
-                    current_page -= 1
-                elif str(reaction.emoji) == '➡️' and current_page < total_pages:
-                    current_page += 1
-                elif str(reaction.emoji) == '⏪':
-                    current_page = 1
-                elif str(reaction.emoji) == '⏩':
-                    current_page = total_pages
-
-                await message.edit(embed=get_page_embed(current_page))
-            except asyncio.TimeoutError:
-                await message.clear_reactions()
-                break
-
 
 @client.command(aliases=["v", "info", "pokemon"])
 async def view(ctx, number: int = None, user: discord.Member = None):
