@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<!-- version 1 -->
+<title>battle-gen9randombattle-35</title>
+<style>
+    html,
+    body {
+        font-family: Verdana, sans-serif;
+        font-size: 10pt;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        padding: 12px 0;
+    }
+
+    .battle-log {
+        font-family: Verdana, sans-serif;
+        font-size: 10pt;
+    }
+
+    .battle-log-inline {
+        border: 1px solid #AAAAAA;
+        background: #EEF2F5;
+        color: black;
+        max-width: 640px;
+        margin: 0 auto 80px;
+        padding-bottom: 5px;
+    }
+
+    .battle-log .inner {
+        padding: 4px 8px 0px 8px;
+    }
+
+    .battle-log .inner-preempt {
+        padding: 0 8px 4px 8px;
+    }
+
+    .battle-log .inner-after {
+        margin-top: 0.5em;
+    }
+
+    .battle-log h2 {
+        margin: 0.5em -8px;
+        padding: 4px 8px;
+        border: 1px solid #AAAAAA;
+        background: #E0E7EA;
+        border-left: 0;
+        border-right: 0;
+        font-family: Verdana, sans-serif;
+        font-size: 13pt;
+    }
+
+    .backprop {
+        top: 0;
+    }
+
+    .battle-log .chat {
+        vertical-align: middle;
+        padding: 3px 0 3px 0;
+        font-size: 8pt;
+    }
+
+    .battle-log .chat strong {
+        color: #40576A;
+    }
+
+    .battle-log .chat em {
+        padding: 1px 4px 1px 3px;
+        color: #000000;
+        font-style: normal;
+    }
+
+    .chat.mine {
+        background: rgba(0, 0, 0, 0.05);
+        margin-left: -8px;
+        margin-right: -8px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .spoiler {
+        color: #BBBBBB;
+        background: #BBBBBB;
+        padding: 0px 3px;
+    }
+
+    .spoiler:hover,
+    .spoiler:active,
+    .spoiler-shown {
+        color: #000000;
+        background: #E2E2E2;
+        padding: 0px 3px;
+    }
+
+    .spoiler a {
+        color: #BBBBBB;
+    }
+
+    .spoiler:hover a,
+    .spoiler:active a,
+    .spoiler-shown a {
+        color: #2288CC;
+    }
+
+    .chat code,
+    .chat .spoiler:hover code,
+    .chat .spoiler:active code,
+    .chat .spoiler-shown code {
+        border: 1px solid #C0C0C0;
+        background: #EEEEEE;
+        color: black;
+        padding: 0 2px;
+    }
+
+    .chat .spoiler code {
+        border: 1px solid #CCCCCC;
+        background: #CCCCCC;
+        color: #CCCCCC;
+    }
+
+    .battle-log .rated {
+        padding: 3px 4px;
+    }
+
+    .battle-log .rated strong {
+        color: white;
+        background: #89A;
+        padding: 1px 4px;
+        border-radius: 4px;
+    }
+
+    .spacer {
+        margin-top: 0.5em;
+    }
+
+    .message-announce {
+        background: #6688AA;
+        color: white;
+        padding: 1px 4px 2px;
+    }
+
+    .message-announce a,
+    .broadcast-green a,
+    .broadcast-blue a,
+    .broadcast-red a {
+        color: #DDEEFF;
+    }
+
+    .broadcast-green {
+        background-color: #559955;
+        color: white;
+        padding: 2px 4px;
+    }
+
+    .broadcast-blue {
+        background-color: #6688AA;
+        color: white;
+        padding: 2px 4px;
+    }
+
+    .infobox {
+        border: 1px solid #6688AA;
+        padding: 2px 4px;
+    }
+
+    .infobox-limited {
+        max-height: 200px;
+        overflow: auto;
+        overflow-x: hidden;
+    }
+
+    .broadcast-red {
+        background-color: #AA5544;
+        color: white;
+        padding: 2px 4px;
+    }
+
+    .message-learn-canlearn {
+        font-weight: bold;
+        color: #228822;
+        text-decoration: underline;
+    }
+
+    .message-learn-cannotlearn {
+        font-weight: bold;
+        color: #CC2222;
+        text-decoration: underline;
+    }
+
+    .message-effect-weak {
+        font-weight: bold;
+        color: #CC2222;
+    }
+
+    .message-effect-resist {
+        font-weight: bold;
+        color: #6688AA;
+    }
+
+    .message-effect-immune {
+        font-weight: bold;
+        color: #666666;
+    }
+
+    .message-learn-list {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .message-throttle-notice,
+    .message-error {
+        color: #992222;
+    }
+
+    .message-overflow,
+    .chat small.message-overflow {
+        font-size: 0pt;
+    }
+
+    .message-overflow::before {
+        font-size: 9pt;
+        content: '...';
+    }
+
+    .subtle {
+        color: #3A4A66;
+    }
+</style>
+<div class="wrapper replay-wrapper" style="max-width:1180px;margin:0 auto">
+    <input type="hidden" name="replayid" value="unregisteredserver-gen8randombattle-320064" />
+    <div class="battle"></div>
+    <div class="battle-log"></div>
+    <div class="replay-controls"></div>
+    <div class="replay-controls-2"></div>
+    <h1 style="font-weight:normal;text-align:center"><strong>poke-env battle replay</strong><br />battle-gen9randombattle-35<br /><a
+            href="http://pokemonshowdown.com/users/randomplayer1" class="subtle" target="_blank">WoopieAI</a>
+        vs. <a href="http://pokemonshowdown.com/users/randomplayer2" class="subtle"
+            target="_blank">changiairport</a></h1>
+    <script type="text/plain" class="battle-log-data">
+    >battle-gen9randombattle-35|init|battle
+|title|WoopieAI vs. changiairport
+|j|☆WoopieAI
+|j|☆changiairport
+|gametype|singles
+|player|p1|WoopieAI|266|
+|player|p2|changiairport|2|
+|teamsize|p1|6
+|teamsize|p2|6
+|gen|9
+|tier|[Gen 9] Random Battle
+|rule|Species Clause: Limit one of each Pokémon
+|rule|HP Percentage Mod: HP is shown in percentages
+|rule|Sleep Clause Mod: Limit one foe put to sleep
+|rule|Illusion Level Mod: Illusion disguises the Pokémon's true level
+|
+|start
+|switch|p1a: Dondozo|Dondozo, L78, M|362/362
+|switch|p2a: Luxray|Luxray, L88, M|100/100
+|-ability|p2a: Luxray|Intimidate|boost
+|-unboost|p1a: Dondozo|atk|1
+|turn|1
+|
+|move|p2a: Luxray|Wild Charge|p1a: Dondozo
+|-supereffective|p1a: Dondozo
+|-damage|p1a: Dondozo|126/362
+|-damage|p2a: Luxray|80/100|[from] Recoil
+|move|p1a: Dondozo|Wave Crash|p2a: Luxray
+|-damage|p2a: Luxray|51/100
+|-damage|p1a: Dondozo|99/362|[from] Recoil
+|
+|-heal|p1a: Dondozo|121/362|[from] item: Leftovers
+|upkeep
+|turn|2
+|
+|move|p2a: Luxray|Volt Switch|p1a: Dondozo
+|-supereffective|p1a: Dondozo
+|-damage|p1a: Dondozo|0 fnt
+|faint|p1a: Dondozo
+|
+|switch|p2a: Delibird|Delibird, M|100/100|[from] Volt Switch
+|
+|upkeep
+|
+|switch|p1a: Tinkaton|Tinkaton, L82, F|274/274
+|-ability|p1a: Tinkaton|Mold Breaker
+|turn|3
+|
+|move|p2a: Delibird|Brave Bird|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|171/274
+|-damage|p2a: Delibird|87/100|[from] Recoil
+|move|p1a: Tinkaton|Play Rough|p2a: Delibird
+|-damage|p2a: Delibird|51/100
+|
+|-heal|p1a: Tinkaton|188/274|[from] item: Leftovers
+|upkeep
+|turn|4
+|
+|move|p2a: Delibird|Ice Spinner|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|118/274
+|move|p1a: Tinkaton|Gigaton Hammer|p2a: Delibird
+|-supereffective|p2a: Delibird
+|-damage|p2a: Delibird|0 fnt
+|faint|p2a: Delibird
+|
+|-heal|p1a: Tinkaton|135/274|[from] item: Leftovers
+|upkeep
+|
+|switch|p2a: Comfey|Comfey, L85, F|100/100
+|turn|5
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|115/274
+|move|p1a: Tinkaton|Play Rough|p2a: Comfey
+|-damage|p2a: Comfey|71/100
+|
+|-heal|p2a: Comfey|77/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|132/274|[from] item: Leftovers
+|upkeep
+|turn|6
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|111/274
+|-heal|p2a: Comfey|84/100|[from] drain|[of] p1a: Tinkaton
+|move|p1a: Tinkaton|Encore|p2a: Comfey
+|-start|p2a: Comfey|Encore
+|
+|-heal|p2a: Comfey|90/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|128/274|[from] item: Leftovers
+|upkeep
+|turn|7
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|108/274
+|-heal|p2a: Comfey|97/100|[from] drain|[of] p1a: Tinkaton
+|move|p1a: Tinkaton|Encore||[still]
+|-fail|p1a: Tinkaton
+|
+|-heal|p2a: Comfey|100/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|125/274|[from] item: Leftovers
+|upkeep
+|turn|8
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|104/274
+|move|p1a: Tinkaton|Play Rough|p2a: Comfey
+|-damage|p2a: Comfey|71/100
+|
+|-heal|p2a: Comfey|77/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|121/274|[from] item: Leftovers
+|upkeep
+|turn|9
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|100/274
+|-heal|p2a: Comfey|84/100|[from] drain|[of] p1a: Tinkaton
+|move|p1a: Tinkaton|Encore||[still]
+|-fail|p1a: Tinkaton
+|
+|-heal|p2a: Comfey|90/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|117/274|[from] item: Leftovers
+|-end|p2a: Comfey|Encore
+|upkeep
+|turn|10
+|
+|move|p2a: Comfey|Taunt|p1a: Tinkaton
+|-start|p1a: Tinkaton|move: Taunt
+|cant|p1a: Tinkaton|move: Taunt|Encore
+|
+|-heal|p2a: Comfey|96/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|134/274|[from] item: Leftovers
+|upkeep
+|turn|11
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|110/274
+|-heal|p2a: Comfey|100/100|[from] drain|[of] p1a: Tinkaton
+|move|p1a: Tinkaton|Play Rough|p2a: Comfey
+|-damage|p2a: Comfey|67/100
+|
+|-heal|p2a: Comfey|73/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|127/274|[from] item: Leftovers
+|upkeep
+|turn|12
+|
+|move|p2a: Comfey|Taunt||[still]
+|-fail|p2a: Comfey
+|move|p1a: Tinkaton|Play Rough|p2a: Comfey
+|-damage|p2a: Comfey|43/100
+|
+|-heal|p2a: Comfey|49/100|[from] item: Leftovers
+|-heal|p1a: Tinkaton|144/274|[from] item: Leftovers
+|-end|p1a: Tinkaton|move: Taunt
+|upkeep
+|turn|13
+|
+|move|p2a: Comfey|Draining Kiss|p1a: Tinkaton
+|-resisted|p1a: Tinkaton
+|-damage|p1a: Tinkaton|124/274
+|-heal|p2a: Comfey|56/100|[from] drain|[of] p1a: Tinkaton
+|move|p1a: Tinkaton|Gigaton Hammer|p2a: Comfey
+|-supereffective|p2a: Comfey
+|-damage|p2a: Comfey|0 fnt
+|faint|p2a: Comfey
+|
+|-heal|p1a: Tinkaton|141/274|[from] item: Leftovers
+|upkeep
+|
+|switch|p2a: Krookodile|Krookodile, L80, F|100/100
+|-ability|p2a: Krookodile|Intimidate|boost
+|-unboost|p1a: Tinkaton|atk|1
+|turn|14
+|
+|move|p1a: Tinkaton|Play Rough|p2a: Krookodile
+|-supereffective|p2a: Krookodile
+|-damage|p2a: Krookodile|64/100
+|move|p2a: Krookodile|Earthquake|p1a: Tinkaton
+|-supereffective|p1a: Tinkaton
+|-damage|p1a: Tinkaton|0 fnt
+|faint|p1a: Tinkaton
+|-damage|p2a: Krookodile|54/100|[from] item: Life Orb
+|
+|upkeep
+|
+|switch|p1a: Honchkrow|Honchkrow, L86, F|312/312
+|turn|15
+|
+|move|p1a: Honchkrow|Sucker Punch|p2a: Krookodile
+|-resisted|p2a: Krookodile
+|-damage|p2a: Krookodile|34/100
+|move|p2a: Krookodile|Earthquake|p1a: Honchkrow
+|-immune|p1a: Honchkrow
+|
+|upkeep
+|turn|16
+|
+|move|p2a: Krookodile|Earthquake|p1a: Honchkrow
+|-immune|p1a: Honchkrow
+|move|p1a: Honchkrow|Brave Bird|p2a: Krookodile
+|-damage|p2a: Krookodile|0 fnt
+|faint|p2a: Krookodile
+|-ability|p1a: Honchkrow|Moxie|boost
+|-boost|p1a: Honchkrow|atk|1
+|-damage|p1a: Honchkrow|280/312|[from] Recoil
+|
+|upkeep
+|
+|switch|p2a: Copperajah|Copperajah, L86, F|100/100
+|turn|17
+|
+|move|p1a: Honchkrow|Brave Bird|p2a: Copperajah
+|-resisted|p2a: Copperajah
+|-damage|p2a: Copperajah|59/100
+|-damage|p1a: Honchkrow|232/312|[from] Recoil
+|move|p2a: Copperajah|Heavy Slam|p1a: Honchkrow
+|-damage|p1a: Honchkrow|0 fnt
+|faint|p1a: Honchkrow
+|
+|upkeep
+|
+|switch|p1a: Iron Hands|Iron Hands, L79|373/373
+|turn|18
+|
+|move|p1a: Iron Hands|Wild Charge|p2a: Copperajah
+|-damage|p2a: Copperajah|23/100
+|-damage|p1a: Iron Hands|341/373|[from] Recoil
+|move|p2a: Copperajah|Heavy Slam|p1a: Iron Hands
+|-resisted|p1a: Iron Hands
+|-damage|p1a: Iron Hands|261/373
+|
+|upkeep
+|turn|19
+|
+|move|p1a: Iron Hands|Wild Charge|p2a: Copperajah
+|-damage|p2a: Copperajah|0 fnt
+|faint|p2a: Copperajah
+|-damage|p1a: Iron Hands|241/373|[from] Recoil
+|
+|upkeep
+|
+|switch|p2a: Regieleki|Regieleki, L79|100/100
+|turn|20
+|
+|move|p2a: Regieleki|Thunderbolt|p1a: Iron Hands
+|-resisted|p1a: Iron Hands
+|-damage|p1a: Iron Hands|183/373
+|move|p1a: Iron Hands|Close Combat|p2a: Regieleki
+|-damage|p2a: Regieleki|7/100
+|-unboost|p1a: Iron Hands|def|1
+|-unboost|p1a: Iron Hands|spd|1
+|
+|upkeep
+|turn|21
+|
+|move|p2a: Regieleki|Explosion|p1a: Iron Hands
+|-crit|p1a: Iron Hands
+|-damage|p1a: Iron Hands|0 fnt
+|faint|p2a: Regieleki
+|faint|p1a: Iron Hands
+|-end|p1a: Iron Hands|Quark Drive|[silent]
+|
+|upkeep
+|
+|switch|p2a: Luxray|Luxray, L88, M|51/100
+|switch|p1a: Venomoth|Venomoth, L84, M|255/255
+|-ability|p2a: Luxray|Intimidate|boost
+|-unboost|p1a: Venomoth|atk|1
+|turn|22
+|
+|move|p1a: Venomoth|Sludge Wave|p2a: Luxray
+|-damage|p2a: Luxray|29/100
+|move|p2a: Luxray|Play Rough|p1a: Venomoth
+|-resisted|p1a: Venomoth
+|-damage|p1a: Venomoth|197/255
+|
+|upkeep
+|turn|23
+|
+|move|p1a: Venomoth|Bug Buzz|p2a: Luxray
+|-damage|p2a: Luxray|5/100
+|move|p2a: Luxray|Wild Charge|p1a: Venomoth
+|-damage|p1a: Venomoth|20/255
+|-damage|p2a: Luxray|0 fnt|[from] Recoil
+|faint|p2a: Luxray
+|
+    </script>
+</div>
+
+<div class="battle-log battle-log-inline" style="display:none"></div>
+
+<script>
+    let daily = Math.floor(Date.now() / 1000 / 60 / 60 / 24); document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js?version' + daily + '"></' + 'script>');
+</script>
+
+<p style="text-align:center"> Replay created by <a href="https://github.com/hsahovic/poke-env">poke-env</a>, with code from <a
+        href="https://github.com/smogon/pokemon-showdown"> pokemon-showdown</a>. If something goes wrong, don't hesitate
+    to open an <a href="https://github.com/hsahovic/poke-env/issues">issue!</a></p>

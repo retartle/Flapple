@@ -1,0 +1,161 @@
+{
+  "battle_id": "battle-gen9randombattle-35",
+  "timestamp": "2025-05-09T01:07:47.801802",
+  "format": "gen9randombattle",
+  "player": "changiairport",
+  "opponent": "WoopieAI",
+  "outcome": "loss",
+  "turns": 23,
+  "history": {
+    "turns": 23,
+    "last_moves": [
+      {
+        "turn": 20,
+        "pokemon": "regieleki",
+        "move": "thunderbolt"
+      },
+      {
+        "turn": 21,
+        "pokemon": "regieleki",
+        "move": "explosion"
+      },
+      {
+        "turn": 21,
+        "pokemon": "regieleki",
+        "move": "switch:luxray"
+      },
+      {
+        "turn": 22,
+        "pokemon": "luxray",
+        "move": "playrough"
+      },
+      {
+        "turn": 23,
+        "pokemon": "luxray",
+        "move": "wildcharge"
+      }
+    ],
+    "opponent_last_moves": []
+  },
+  "team": {
+    "active": {
+      "species": "luxray",
+      "types": [
+        "ELECTRIC (pokemon type) object"
+      ],
+      "moves": [
+        "playrough",
+        "voltswitch",
+        "wildcharge",
+        "throatchop"
+      ]
+    },
+    "pokemon": [
+      {
+        "species": "luxray",
+        "types": [
+          "ELECTRIC (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "comfey",
+        "types": [
+          "FAIRY (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "krookodile",
+        "types": [
+          "GROUND (pokemon type) object",
+          "DARK (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "copperajah",
+        "types": [
+          "STEEL (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "delibird",
+        "types": [
+          "ICE (pokemon type) object",
+          "FLYING (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "regieleki",
+        "types": [
+          "ELECTRIC (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      }
+    ]
+  },
+  "opponent_team": {
+    "active": {
+      "species": "venomoth",
+      "types": [
+        "BUG (pokemon type) object",
+        "POISON (pokemon type) object"
+      ]
+    },
+    "pokemon": [
+      {
+        "species": "dondozo",
+        "types": [
+          "WATER (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "tinkaton",
+        "types": [
+          "FAIRY (pokemon type) object",
+          "STEEL (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "honchkrow",
+        "types": [
+          "DARK (pokemon type) object",
+          "FLYING (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "ironhands",
+        "types": [
+          "FIGHTING (pokemon type) object",
+          "ELECTRIC (pokemon type) object"
+        ],
+        "fainted": true,
+        "status": "FNT (status) object"
+      },
+      {
+        "species": "venomoth",
+        "types": [
+          "BUG (pokemon type) object",
+          "POISON (pokemon type) object"
+        ],
+        "fainted": false,
+        "status": "None"
+      }
+    ]
+  }
+}
